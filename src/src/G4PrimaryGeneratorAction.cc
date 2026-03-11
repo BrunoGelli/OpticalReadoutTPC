@@ -50,10 +50,11 @@ void G4PrimaryGeneratorAction::GeneratePrimaries(G4Event* anEvent) {
     position = G4ThreeVector(fBlipXcm * cm, fBlipYcm * cm, fBlipZcm * cm);
     direction = G4RandomDirection();
   } else {
+    
     particle = G4ParticleTable::GetParticleTable()->FindParticle("mu-");
     energy = fMuonEnergyGeV * GeV;
-    position = G4ThreeVector(0., 0., 45. * cm);
-    direction = G4ThreeVector(0., 0., -1.);
+    position = G4ThreeVector(25*cm, 25*cm, 0. * cm);
+    direction = G4ThreeVector(-1., -1., 0.);
   }
 
   particleGun->SetParticleDefinition(particle);

@@ -1,4 +1,4 @@
-void EventDisplay() {
+void EventDisplay(int evt) {
     TFile *f = new TFile("OutPut.root");
     if (!f || f->IsZombie()) {
         std::cerr << "Failed to open OutPut.root" << std::endl;
@@ -31,7 +31,7 @@ void EventDisplay() {
         TString htitle = Form("LAPPD %d;x [cm];y [cm];hits", lappd);
         TH2D *h = new TH2D(hname, htitle, bins, xyMin, xyMax, bins, xyMin, xyMax);
         TString drawCmd = "y_cm:x_cm>>" + hname;
-        TString cut = Form("lappd_id == %d", lappd);
+        TString cut = Form("lappd_id == %d && evt == %d", lappd, evt);
         hits->Draw(drawCmd, cut, "COLZ");
         gPad->SetLogz();
     }
