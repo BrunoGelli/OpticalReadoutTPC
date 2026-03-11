@@ -48,9 +48,9 @@ void G4DetectorConstruction::DefineMaterials() {
   nistManager->FindOrBuildMaterial("G4_Al");
   nistManager->FindOrBuildMaterial("G4_Pyrex_Glass");
 
-  const G4double photonEnergy[kNumOpticalEntries] = {2.0 * eV, 4.2 * eV};
-  const G4double waterRindex[kNumOpticalEntries] = {1.333 * Refr_Index, 1.343 * Refr_Index};
-  const G4double waterAbsLength[kNumOpticalEntries] = {30. * m, 30. * m};
+  G4double photonEnergy[kNumOpticalEntries] = {2.0 * eV, 4.2 * eV};
+  G4double waterRindex[kNumOpticalEntries] = {1.333 * Refr_Index, 1.343 * Refr_Index};
+  G4double waterAbsLength[kNumOpticalEntries] = {30. * m, 30. * m};
 
   auto* waterMPT = new G4MaterialPropertiesTable();
   waterMPT->AddProperty("RINDEX", photonEnergy, waterRindex, kNumOpticalEntries);
@@ -101,9 +101,9 @@ G4VPhysicalVolume* G4DetectorConstruction::DefineVolumes() {
   new G4PVPlacement(nullptr, {0., 0., driftHalfZ + 0.5 * lappdWindowThickness}, fLappdTopLogical, "LAPPDTop", worldLogical, false, 0, fCheckOverlaps);
   new G4PVPlacement(nullptr, {0., 0., -driftHalfZ - 0.5 * lappdWindowThickness}, fLappdBottomLogical, "LAPPDBottom", worldLogical, false, 1, fCheckOverlaps);
 
-  const G4double photonEnergy[kNumOpticalEntries] = {2.0 * eV, 4.2 * eV};
-  const G4double reflectivity[kNumOpticalEntries] = {fConfig.wallReflectivity, fConfig.wallReflectivity};
-  const G4double efficiency[kNumOpticalEntries] = {0.0, 0.0};
+  G4double photonEnergy[kNumOpticalEntries] = {2.0 * eV, 4.2 * eV};
+  G4double reflectivity[kNumOpticalEntries] = {fConfig.wallReflectivity, fConfig.wallReflectivity};
+  G4double efficiency[kNumOpticalEntries] = {0.0, 0.0};
 
   auto* wallSurfaceMPT = new G4MaterialPropertiesTable();
   wallSurfaceMPT->AddProperty("REFLECTIVITY", photonEnergy, reflectivity, kNumOpticalEntries);
