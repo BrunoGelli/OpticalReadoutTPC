@@ -35,6 +35,7 @@ void G4RunAction::InitializeAnalysis() {
 
   analysisManager->CreateNtuple("event", "event truth summary");
   analysisManager->CreateNtupleIColumn("evt");
+  analysisManager->CreateNtupleIColumn("run");
   analysisManager->CreateNtupleIColumn("primary_pdg");
   analysisManager->CreateNtupleDColumn("primary_x_cm");
   analysisManager->CreateNtupleDColumn("primary_y_cm");
@@ -43,6 +44,7 @@ void G4RunAction::InitializeAnalysis() {
   analysisManager->CreateNtupleDColumn("dir_y");
   analysisManager->CreateNtupleDColumn("dir_z");
   analysisManager->CreateNtupleDColumn("primary_energy_MeV");
+  analysisManager->CreateNtupleDColumn("primary_t0_ns");
   analysisManager->CreateNtupleDColumn("edep_water_MeV");
   analysisManager->CreateNtupleIColumn("n_photons_generated");
   analysisManager->CreateNtupleIColumn("n_hits_top");
@@ -52,6 +54,7 @@ void G4RunAction::InitializeAnalysis() {
 
   analysisManager->CreateNtuple("photon_hits", "photon and MC-like pixel hit information");
   analysisManager->CreateNtupleIColumn("evt");
+  analysisManager->CreateNtupleIColumn("run");
   analysisManager->CreateNtupleIColumn("lappd_id");
   analysisManager->CreateNtupleDColumn("x_cm");
   analysisManager->CreateNtupleDColumn("y_cm");

@@ -15,7 +15,7 @@ void G4ActionInitialization::BuildForMaster() const { SetUserAction(new G4RunAct
 
 void G4ActionInitialization::Build() const {
   auto* eventAction = new G4EventAction;
-  auto* primaryAction = new G4PrimaryGeneratorAction(eventAction);
+  auto* primaryAction = new G4PrimaryGeneratorAction(eventAction, fConfig);
 
   SetUserAction(primaryAction);
   SetUserAction(new G4RunAction(fConfig));

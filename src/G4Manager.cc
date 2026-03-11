@@ -20,14 +20,14 @@ int main(int argc, char** argv) {
   }
 
   DetectorConfig GeoConf = {
-      100.0,  // worldRadiusCm
-      200.0, // worldHeightCm
-      20.0,  // lappdSizeCm
-      100.0,  // driftDistanceCm
-      2.0,   // guidePitchCm
-      0.5,   // wallThicknessMm
+      50.0,  // worldRadiusCm
+      100.0, // worldHeightCm
+      50.0,  // lappdSizeCm
+      80.0,  // driftDistanceCm
+      5.0,   // guidePitchCm
+      1.0,   // wallThicknessMm
       0.97,  // wallReflectivity
-      0.2    // lappdPixelCm
+      0.6    // lappdPixelCm
   };
 
   auto* runManager = new G4RunManager;

@@ -18,7 +18,8 @@ class G4EventAction : public G4UserEventAction {
     void SetPrimaryInfo(const G4ThreeVector& position,
                         const G4ThreeVector& direction,
                         G4double kineticEnergy,
-                        G4int pdgCode);
+                        G4int pdgCode,
+                        G4double t0);
     void AddGeneratedPhoton();
     void AddDetectedPhoton(G4int lappdId,
                            G4double x,
@@ -35,6 +36,7 @@ class G4EventAction : public G4UserEventAction {
     G4ThreeVector fPrimaryDirection;
     G4double fPrimaryEnergy;
     G4int fPrimaryPdg;
+    G4double fPrimaryT0;
     G4double fEnergyDeposit;
     G4int fPhotonsGenerated;
     G4int fPhotonsDetectedTop;

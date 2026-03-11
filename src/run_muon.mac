@@ -3,8 +3,13 @@
 /event/verbose 0
 /tracking/verbose 0
 
-# Through-going muon example
+# Through-going muons from the cylindrical wall toward the center
 /ortpc/generator/mode muon
 /ortpc/generator/muonEnergyGeV 4.0
+/ortpc/generator/muonFromWall true
+/ortpc/generator/muonWallPhiDeg 0.0
+/ortpc/generator/muonWallZcm 0.0
+/ortpc/generator/muonWallInsetCm 0.5
+/ortpc/generator/muonForceTransverse true
 
 /run/beamOn 200

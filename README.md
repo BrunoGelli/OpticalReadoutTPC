@@ -21,6 +21,11 @@ A configurable primary generator is available via macro commands:
 - `/ortpc/generator/mode muon` (default) for through-going muons
 - `/ortpc/generator/mode blip` for isotropic low-energy electron blips
 - `/ortpc/generator/muonEnergyGeV <value>`
+- `/ortpc/generator/muonFromWall <true|false>`
+- `/ortpc/generator/muonWallPhiDeg <value>`
+- `/ortpc/generator/muonWallZcm <value>`
+- `/ortpc/generator/muonWallInsetCm <value>`
+- `/ortpc/generator/muonForceTransverse <true|false>` (forces dz=0)
 - `/ortpc/generator/blipEnergyMeV <value>`
 - `/ortpc/generator/blipXcm <value>`
 - `/ortpc/generator/blipYcm <value>`
@@ -29,7 +34,7 @@ A configurable primary generator is available via macro commands:
 ## Output
 ROOT output (`OutPut.root`) contains:
 - `event`: truth-like per-event summary
-  - primary position/direction/energy
+  - run/event id + primary position/direction/energy/time-zero
   - energy deposition in water
   - number of Cherenkov photons generated
   - number of photons detected in each LAPPD
@@ -77,3 +82,14 @@ cmake .. -DGeant4_DIR=/path/to/lib/cmake/Geant4
    ```
 5. Inspect `OutPut.root` (`event`, `photon_hits`, `config`) and optionally use `src/EventDisplay.C`.
 
+
+## Event display with timing
+Use ROOT macro `src/EventDisplay.C` with:
+- `EventDisplay(runId, eventId, lappdId, pixelX, pixelY)`
+- If `pixelX`/`pixelY` are negative, it auto-selects the most populated pixel for that run/event/LAPPD and draws the arrival-time histogram (`t_hit - t0`) for that selected lattice/pixel space.
+
+Example:
+```cpp
+.x src/EventDisplay.C
+EventDisplay(0, 0, 0, 10, 12);
+```
