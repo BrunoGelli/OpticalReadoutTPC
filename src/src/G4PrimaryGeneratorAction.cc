@@ -16,7 +16,10 @@ G4PrimaryGeneratorAction::G4PrimaryGeneratorAction(G4EventAction* eventAction)
       fMessenger(nullptr),
       fMode("muon"),
       fMuonEnergyGeV(4.0),
-      fBlipEnergyMeV(10.0) {
+      fBlipEnergyMeV(10.0),
+      fBlipXcm(0.0),
+      fBlipYcm(0.0),
+      fBlipZcm(0.0) {
   DefineCommands();
 }
 
@@ -30,6 +33,9 @@ void G4PrimaryGeneratorAction::DefineCommands() {
   fMessenger->DeclareProperty("mode", fMode, "Primary mode: muon or blip.");
   fMessenger->DeclareProperty("muonEnergyGeV", fMuonEnergyGeV, "Through-going muon energy in GeV.");
   fMessenger->DeclareProperty("blipEnergyMeV", fBlipEnergyMeV, "Blip electron energy in MeV.");
+  fMessenger->DeclareProperty("blipXcm", fBlipXcm, "Blip point-source x position in cm.");
+  fMessenger->DeclareProperty("blipYcm", fBlipYcm, "Blip point-source y position in cm.");
+  fMessenger->DeclareProperty("blipZcm", fBlipZcm, "Blip point-source z position in cm.");
 }
 
 void G4PrimaryGeneratorAction::GeneratePrimaries(G4Event* anEvent) {
@@ -41,7 +47,7 @@ void G4PrimaryGeneratorAction::GeneratePrimaries(G4Event* anEvent) {
   if (fMode == "blip") {
     particle = G4ParticleTable::GetParticleTable()->FindParticle("e-");
     energy = fBlipEnergyMeV * MeV;
-    position = G4ThreeVector(0., 0., 0.);
+    position = G4ThreeVector(fBlipXcm * cm, fBlipYcm * cm, fBlipZcm * cm);
     direction = G4RandomDirection();
   } else {
     particle = G4ParticleTable::GetParticleTable()->FindParticle("mu-");

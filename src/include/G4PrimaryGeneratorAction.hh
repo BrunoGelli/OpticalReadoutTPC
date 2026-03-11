@@ -26,6 +26,9 @@ class G4PrimaryGeneratorAction : public G4VUserPrimaryGeneratorAction {
     G4String fMode;
     G4double fMuonEnergyGeV;
     G4double fBlipEnergyMeV;
+    G4double fBlipXcm;
+    G4double fBlipYcm;
+    G4double fBlipZcm;
   };
 
 #endif /*G4PrimaryGeneratorAction_h*/

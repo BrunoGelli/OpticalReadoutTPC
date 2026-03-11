@@ -1,0 +1,26 @@
+#/control/verbose 1
+/run/verbose 1
+/event/verbose 0
+/tracking/verbose 0
+
+# Point-source electron blips at different positions (isotropic each event)
+/ortpc/generator/mode blip
+/ortpc/generator/blipEnergyMeV 8.0
+
+# Center point source
+/ortpc/generator/blipXcm 0.0
+/ortpc/generator/blipYcm 0.0
+/ortpc/generator/blipZcm 0.0
+/run/beamOn 100
+
+# +x shifted point source
+/ortpc/generator/blipXcm 10.0
+/ortpc/generator/blipYcm 0.0
+/ortpc/generator/blipZcm 0.0
+/run/beamOn 100
+
+# +z shifted point source
+/ortpc/generator/blipXcm 0.0
+/ortpc/generator/blipYcm 0.0
+/ortpc/generator/blipZcm 20.0
+/run/beamOn 100

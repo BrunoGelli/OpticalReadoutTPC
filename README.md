@@ -22,6 +22,9 @@ A configurable primary generator is available via macro commands:
 - `/ortpc/generator/mode blip` for isotropic low-energy electron blips
 - `/ortpc/generator/muonEnergyGeV <value>`
 - `/ortpc/generator/blipEnergyMeV <value>`
+- `/ortpc/generator/blipXcm <value>`
+- `/ortpc/generator/blipYcm <value>`
+- `/ortpc/generator/blipZcm <value>`
 
 ## Output
 ROOT output (`OutPut.root`) contains:
@@ -56,3 +59,21 @@ If Geant4 is not in a default CMake prefix, set `Geant4_DIR` (or `CMAKE_PREFIX_P
 ```bash
 cmake .. -DGeant4_DIR=/path/to/lib/cmake/Geant4
 ```
+
+
+## Suggested workflow
+1. **Build once** in a separate build directory.
+2. **Run in GUI** to inspect geometry:
+   ```bash
+   ./g4Sim
+   ```
+3. **Run batch muons**:
+   ```bash
+   ./g4Sim ../src/run_muon.mac 1.0
+   ```
+4. **Run batch point sources** (multiple blip source positions):
+   ```bash
+   ./g4Sim ../src/run_point_sources.mac 1.0
+   ```
+5. Inspect `OutPut.root` (`event`, `photon_hits`, `config`) and optionally use `src/EventDisplay.C`.
+
