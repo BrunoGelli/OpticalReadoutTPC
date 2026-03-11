@@ -1,132 +1,98 @@
+#include "G4RunAction.hh"
+
+#include "G4AnalysisManager.hh"
+#include "G4Run.hh"
 #include "G4Timer.hh"
 
-#include "G4RunAction.hh"
-#include "G4Constantes.hh"
-
-#include "G4Run.hh"
-#include "G4RunManager.hh"
-#include "G4EventManager.hh"
-#include "g4root.hh"
-
-
-#include <fstream>
-
-// #include "G4NeutronHPManager.hh"
-
-using namespace std;
-
-//================================================================================
-
-G4RunAction::G4RunAction(const DetectorConfig& config) : G4UserRunAction(), fConfig(config) {
-    
-    timer = new G4Timer;
-    nOfReflections_Total = 0;
-    nOfDetections_Total = 0;
-    TOF_Detections_Total = 0;
+G4RunAction::G4RunAction(const DetectorConfig& config)
+    : G4UserRunAction(),
+      nOfReflections_Total(0),
+      nOfDetections_Total(0),
+      TOF_Detections_Total(0),
+      timer(new G4Timer),
+      fConfig(config),
+      fAnalysisInitialized(false) {
+  auto* analysisManager = G4AnalysisManager::Instance();
+  analysisManager->SetVerboseLevel(0);
 }
-
-//================================================================================
 
 G4RunAction::~G4RunAction() {
-    
-    delete timer;
-  
-}
-
-//================================================================================
-
-void G4RunAction::BeginOfRunAction(const G4Run* aRun) {
-    
-    // G4NeutronHPManager::GetInstance()->SetVerboseLevel(0);
-
-
-    G4cout << "### Run " << aRun->GetRunID() << " start." << G4endl;
-
-    G4AnalysisManager* analysisManager = G4AnalysisManager::Instance();
-    
-    G4cout << "Using " << analysisManager->GetType() << " analysis manager." << G4endl;
-    timer->Start();
-
-    analysisManager->OpenFile("OutPut");
-    analysisManager->SetVerboseLevel(0);
-
-
-    // Indica o id do primeiro histograma criado -- default = 0
-    analysisManager->SetFirstHistoId(1);
-    // Cria histogramas    -- (nome, titulo, nbins, xmin, xmax)
-    analysisManager->CreateH1("0","Time of arrival",5000,0.,10);
-
-
-    // Indica o id da primeira ntuple criada -- default = 0
-    analysisManager->SetFirstNtupleId(1);
-    //Declara ntuples
-    analysisManager->CreateNtuple("ntuple", "data");
-    analysisManager->CreateNtupleIColumn("evt");
-    analysisManager->CreateNtupleDColumn("x");
-    analysisManager->CreateNtupleDColumn("y");
-    analysisManager->CreateNtupleDColumn("z");
-    analysisManager->CreateNtupleDColumn("t");
-    analysisManager->CreateNtupleDColumn("energy");
-    analysisManager->CreateNtupleDColumn("theta");
-    analysisManager->CreateNtupleDColumn("dx");
-    analysisManager->CreateNtupleDColumn("dy");
-    analysisManager->CreateNtupleDColumn("dz");
-    analysisManager->CreateNtupleIColumn("module");
-
-    analysisManager->FinishNtuple();
-
-    // Second ntuple (detector config)
-    analysisManager->CreateNtuple("config", "detector config");
-    analysisManager->CreateNtupleIColumn("sizeX");
-    analysisManager->CreateNtupleIColumn("sizeY");
-    analysisManager->CreateNtupleIColumn("sizeZ");
-    analysisManager->CreateNtupleDColumn("pixelSizeY");
-    analysisManager->CreateNtupleDColumn("pixelSizeZ");
-    analysisManager->FinishNtuple();
-
-    // Fill the config ntuple once per run
-    analysisManager->FillNtupleIColumn(2, 0, fConfig.sizeX);
-    analysisManager->FillNtupleIColumn(2, 1, fConfig.sizeY);
-    analysisManager->FillNtupleIColumn(2, 2, fConfig.sizeZ);
-    analysisManager->FillNtupleDColumn(2, 3, fConfig.pixelSizeY);
-    analysisManager->FillNtupleDColumn(2, 4, fConfig.pixelSizeZ);
-    analysisManager->AddNtupleRow(2);
-
-}
-
-//================================================================================
-
-void G4RunAction::EndOfRunAction(const G4Run* aRun) {
-    G4cout << "End of run." << G4endl;
-    timer->Stop();
-
-    G4AnalysisManager* analysisManager = G4AnalysisManager::Instance();
-
-
-
-//     // Get the actual TFile from G4AnalysisManager (if using ROOT)
-//     TFile* file = (TFile*) analysisManager->GetFile();
-
-
-// // struct DetectorConfig {
-// //     int sizeX, sizeY, sizeZ;
-// //     int pixelSizeY, pixelSizeZ;
-// // };
-//     if (file) {
-//         file->cd();
-//         file->WriteObject(new TParameter<int>("sizeX", config.sizeX), "sizeX");
-//         file->WriteObject(new TParameter<int>("sizeY", config.sizeY), "sizeY");
-//         file->WriteObject(new TParameter<int>("sizeZ", config.sizeZ), "sizeZ");
-//         file->WriteObject(new TParameter<int>("pixelSizeY", config.pixelSizeY), "pixelSizeY");
-//         file->WriteObject(new TParameter<int>("pixelSizeZ", config.pixelSizeZ), "pixelSizeZ");
-//     }
-
-
+  auto* analysisManager = G4AnalysisManager::Instance();
+  if (fAnalysisInitialized) {
     analysisManager->Write();
     analysisManager->CloseFile();
-
-    delete G4AnalysisManager::Instance();
-        
+  }
+  delete timer;
 }
 
-//================================================================================
+void G4RunAction::InitializeAnalysis() {
+  if (fAnalysisInitialized) {
+    return;
+  }
+
+  auto* analysisManager = G4AnalysisManager::Instance();
+  analysisManager->OpenFile("OutPut.root");
+
+  analysisManager->CreateNtuple("event", "event truth summary");
+  analysisManager->CreateNtupleIColumn("evt");
+  analysisManager->CreateNtupleIColumn("primary_pdg");
+  analysisManager->CreateNtupleDColumn("primary_x_cm");
+  analysisManager->CreateNtupleDColumn("primary_y_cm");
+  analysisManager->CreateNtupleDColumn("primary_z_cm");
+  analysisManager->CreateNtupleDColumn("dir_x");
+  analysisManager->CreateNtupleDColumn("dir_y");
+  analysisManager->CreateNtupleDColumn("dir_z");
+  analysisManager->CreateNtupleDColumn("primary_energy_MeV");
+  analysisManager->CreateNtupleDColumn("edep_water_MeV");
+  analysisManager->CreateNtupleIColumn("n_photons_generated");
+  analysisManager->CreateNtupleIColumn("n_hits_top");
+  analysisManager->CreateNtupleIColumn("n_hits_bottom");
+  analysisManager->CreateNtupleIColumn("n_hits_total");
+  analysisManager->FinishNtuple();
+
+  analysisManager->CreateNtuple("photon_hits", "photon and MC-like pixel hit information");
+  analysisManager->CreateNtupleIColumn("evt");
+  analysisManager->CreateNtupleIColumn("lappd_id");
+  analysisManager->CreateNtupleDColumn("x_cm");
+  analysisManager->CreateNtupleDColumn("y_cm");
+  analysisManager->CreateNtupleDColumn("z_cm");
+  analysisManager->CreateNtupleDColumn("t_ns");
+  analysisManager->CreateNtupleDColumn("energy_eV");
+  analysisManager->CreateNtupleIColumn("pixel_x");
+  analysisManager->CreateNtupleIColumn("pixel_y");
+  analysisManager->FinishNtuple();
+
+  analysisManager->CreateNtuple("config", "detector config");
+  analysisManager->CreateNtupleDColumn("world_radius_cm");
+  analysisManager->CreateNtupleDColumn("world_height_cm");
+  analysisManager->CreateNtupleDColumn("lappd_size_cm");
+  analysisManager->CreateNtupleDColumn("drift_distance_cm");
+  analysisManager->CreateNtupleDColumn("guide_pitch_cm");
+  analysisManager->CreateNtupleDColumn("wall_thickness_mm");
+  analysisManager->CreateNtupleDColumn("wall_reflectivity");
+  analysisManager->CreateNtupleDColumn("lappd_pixel_cm");
+  analysisManager->FinishNtuple();
+
+  analysisManager->FillNtupleDColumn(2, 0, fConfig.worldRadiusCm);
+  analysisManager->FillNtupleDColumn(2, 1, fConfig.worldHeightCm);
+  analysisManager->FillNtupleDColumn(2, 2, fConfig.lappdSizeCm);
+  analysisManager->FillNtupleDColumn(2, 3, fConfig.driftDistanceCm);
+  analysisManager->FillNtupleDColumn(2, 4, fConfig.guidePitchCm);
+  analysisManager->FillNtupleDColumn(2, 5, fConfig.wallThicknessMm);
+  analysisManager->FillNtupleDColumn(2, 6, fConfig.wallReflectivity);
+  analysisManager->FillNtupleDColumn(2, 7, fConfig.lappdPixelCm);
+  analysisManager->AddNtupleRow(2);
+
+  fAnalysisInitialized = true;
+}
+
+void G4RunAction::BeginOfRunAction(const G4Run* aRun) {
+  G4cout << "### Run " << aRun->GetRunID() << " start." << G4endl;
+  InitializeAnalysis();
+}
+
+void G4RunAction::EndOfRunAction(const G4Run*) {
+  // Intentionally empty.
+  // Multiple /run/beamOn commands in one macro are supported;
+  // output is written once in the destructor at application shutdown.
+}
