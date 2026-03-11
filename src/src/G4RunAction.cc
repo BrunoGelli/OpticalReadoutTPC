@@ -1,8 +1,8 @@
 #include "G4RunAction.hh"
 
+#include "G4AnalysisManager.hh"
 #include "G4Run.hh"
 #include "G4Timer.hh"
-#include "G4AnalysisManager.hh"
 
 G4RunAction::G4RunAction(const DetectorConfig& config)
     : G4UserRunAction(),
@@ -10,16 +10,28 @@ G4RunAction::G4RunAction(const DetectorConfig& config)
       nOfDetections_Total(0),
       TOF_Detections_Total(0),
       timer(new G4Timer),
-      fConfig(config) {}
+      fConfig(config),
+      fAnalysisInitialized(false) {
+  auto* analysisManager = G4AnalysisManager::Instance();
+  analysisManager->SetVerboseLevel(0);
+}
 
-G4RunAction::~G4RunAction() { delete timer; }
+G4RunAction::~G4RunAction() {
+  auto* analysisManager = G4AnalysisManager::Instance();
+  if (fAnalysisInitialized) {
+    analysisManager->Write();
+    analysisManager->CloseFile();
+  }
+  delete timer;
+}
 
-void G4RunAction::BeginOfRunAction(const G4Run* aRun) {
-  G4cout << "### Run " << aRun->GetRunID() << " start." << G4endl;
+void G4RunAction::InitializeAnalysis() {
+  if (fAnalysisInitialized) {
+    return;
+  }
 
   auto* analysisManager = G4AnalysisManager::Instance();
   analysisManager->OpenFile("OutPut.root");
-  analysisManager->SetVerboseLevel(0);
 
   analysisManager->CreateNtuple("event", "event truth summary");
   analysisManager->CreateNtupleIColumn("evt");
@@ -70,11 +82,17 @@ void G4RunAction::BeginOfRunAction(const G4Run* aRun) {
   analysisManager->FillNtupleDColumn(2, 6, fConfig.wallReflectivity);
   analysisManager->FillNtupleDColumn(2, 7, fConfig.lappdPixelCm);
   analysisManager->AddNtupleRow(2);
+
+  fAnalysisInitialized = true;
+}
+
+void G4RunAction::BeginOfRunAction(const G4Run* aRun) {
+  G4cout << "### Run " << aRun->GetRunID() << " start." << G4endl;
+  InitializeAnalysis();
 }
 
 void G4RunAction::EndOfRunAction(const G4Run*) {
-  auto* analysisManager = G4AnalysisManager::Instance();
-  analysisManager->Write();
-  analysisManager->CloseFile();
-  delete G4AnalysisManager::Instance();
+  // Intentionally empty.
+  // Multiple /run/beamOn commands in one macro are supported;
+  // output is written once in the destructor at application shutdown.
 }

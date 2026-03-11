@@ -21,8 +21,11 @@ class G4RunAction : public G4UserRunAction {
     G4double TOF_Detections_Total;
 
   private:
+    void InitializeAnalysis();
+
     G4Timer* timer;
     DetectorConfig fConfig;
+    G4bool fAnalysisInitialized;
 };
 
 #endif /*G4RunAction_h*/
