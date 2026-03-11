@@ -1,6 +1,7 @@
 #include "G4EventAction.hh"
 
 #include "G4Event.hh"
+#include "G4Run.hh"
 #include "G4RunManager.hh"
 #include "G4SystemOfUnits.hh"
 #include "G4AnalysisManager.hh"
