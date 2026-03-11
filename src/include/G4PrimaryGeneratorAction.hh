@@ -4,31 +4,28 @@
 #include "G4VUserPrimaryGeneratorAction.hh"
 #include "globals.hh"
 
-class G4ParticleGun;
 class G4Event;
-class G4PrimaryGeneratorMessenger;
-
-// ============================================================================
+class G4EventAction;
+class G4GenericMessenger;
+class G4ParticleGun;
 
 class G4PrimaryGeneratorAction : public G4VUserPrimaryGeneratorAction {
-    
   public:
-    G4PrimaryGeneratorAction();
-   ~G4PrimaryGeneratorAction();
+    explicit G4PrimaryGeneratorAction(G4EventAction* eventAction);
+    ~G4PrimaryGeneratorAction() override;
 
-  public:
-    void GeneratePrimaries(G4Event*);
-
-    void SetOptPhotonPolar();
-    void SetOptPhotonPolar(G4double);
-
-    bool flag_alpha;
+    void GeneratePrimaries(G4Event*) override;
 
   private:
-    G4ParticleGun* particleGun;
-    
-};
+    void DefineCommands();
 
-// ============================================================================
+    G4ParticleGun* particleGun;
+    G4EventAction* fEventAction;
+    G4GenericMessenger* fMessenger;
+
+    G4String fMode;
+    G4double fMuonEnergyGeV;
+    G4double fBlipEnergyMeV;
+  };
 
 #endif /*G4PrimaryGeneratorAction_h*/
