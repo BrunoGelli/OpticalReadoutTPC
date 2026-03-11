@@ -18,8 +18,6 @@
 
 #include <cmath>
 
-#include "G4HadronicProcessStore.hh"
-#include "G4NeutronHPManager.hh"
 
 namespace {
 constexpr G4int kNumOpticalEntries = 2;
@@ -34,8 +32,6 @@ G4DetectorConstruction::G4DetectorConstruction(G4double RIndex, DetectorConfig& 
       fWallLogical(nullptr),
       fLappdTopLogical(nullptr),
       fLappdBottomLogical(nullptr) {
-  G4NeutronHPManager::GetInstance()->SetVerboseLevel(0);
-  G4HadronicProcessStore::Instance()->SetVerbose(0);
 }
 
 G4DetectorConstruction::~G4DetectorConstruction() = default;

@@ -2,7 +2,7 @@
 
 #include "G4Run.hh"
 #include "G4Timer.hh"
-#include "g4root.hh"
+#include "G4AnalysisManager.hh"
 
 G4RunAction::G4RunAction(const DetectorConfig& config)
     : G4UserRunAction(),
@@ -18,7 +18,7 @@ void G4RunAction::BeginOfRunAction(const G4Run* aRun) {
   G4cout << "### Run " << aRun->GetRunID() << " start." << G4endl;
 
   auto* analysisManager = G4AnalysisManager::Instance();
-  analysisManager->OpenFile("OutPut");
+  analysisManager->OpenFile("OutPut.root");
   analysisManager->SetVerboseLevel(0);
 
   analysisManager->CreateNtuple("event", "event truth summary");
