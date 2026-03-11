@@ -1,60 +1,92 @@
-void EventDisplay() {
-    // Open file and get trees
+// Usage examples from ROOT prompt:
+// .x EventDisplay.C
+// EventDisplay(0, 0, 0, 10, 12);  // run 0, event 0, top LAPPD, selected pixel
+
+void EventDisplay(int runId = 0, int eventId = 0, int lappd = 0, int pixelX = -1, int pixelY = -1) {
     TFile *f = new TFile("OutPut.root");
     if (!f || f->IsZombie()) {
         std::cerr << "Failed to open OutPut.root" << std::endl;
         return;
     }
 
-    // Get data tree and config tree
-    TTree *t = (TTree*)f->Get("ntuple");
+    TTree *hits = (TTree*)f->Get("photon_hits");
     TTree *config = (TTree*)f->Get("config");
-    if (!t || !config) {
-        std::cerr << "Missing ntuple or config tree!" << std::endl;
+    TTree *evt = (TTree*)f->Get("event");
+    if (!hits || !config || !evt) {
+        std::cerr << "Missing photon_hits/config/event tree!" << std::endl;
         return;
     }
 
-    // Read detector configuration
-    int sizeY, sizeZ;
-    double pixelSizeY, pixelSizeZ;
-    config->SetBranchAddress("sizeY", &sizeY);
-    config->SetBranchAddress("sizeZ", &sizeZ);
-    config->SetBranchAddress("pixelSizeY", &pixelSizeY);
-    config->SetBranchAddress("pixelSizeZ", &pixelSizeZ);
-    config->GetEntry(0); // read the only entry
+    double lappdSizeCm = 50.0;
+    double pixelCm = 0.6;
+    config->SetBranchAddress("lappd_size_cm", &lappdSizeCm);
+    config->SetBranchAddress("lappd_pixel_cm", &pixelCm);
+    config->GetEntry(0);
 
-    // Compute histogram bounds and binning
-    double yMin = -sizeY / 2.0;
-    double yMax =  sizeY / 2.0;
-    double zMin = -sizeZ / 2.0;
-    double zMax =  sizeZ / 2.0;
-    int yBins = sizeY / pixelSizeY;
-    int zBins = sizeZ / pixelSizeZ;
+    double primary_t0_ns = 0.0;
+    int evt_run = -1;
+    int evt_evt = -1;
+    evt->SetBranchAddress("run", &evt_run);
+    evt->SetBranchAddress("evt", &evt_evt);
+    evt->SetBranchAddress("primary_t0_ns", &primary_t0_ns);
 
-    
-    // Create canvas with 2x2 pads
-    TCanvas *c = new TCanvas("c", "Event Display per Module", 1000, 1000);
-    c->Divide(2, 2);
-
-    // Loop over modules
-    for (int module = 0; module < 4; ++module) {
-        c->cd(module + 1);
-        
-        // Create unique histogram name per module
-        TString hname = Form("h%d", module);
-        TString htitle = Form("Module %d;Z [cm];Y [cm];Edep [MeV]", module);
-        TH2D *h = new TH2D(hname, htitle,
-                           zBins, zMin, zMax,
-                           yBins, yMin, yMax);
-
-        // Fill histogram for this module only
-        TString drawCmd = "dy:dz>>" + hname;
-        TString cut = Form("module == %d", module);
-        t->Draw(drawCmd, "energy*(" + cut + ")", "COLZ");
-
-        gPad->SetLogz();
+    bool foundEvent = false;
+    for (Long64_t i = 0; i < evt->GetEntries(); ++i) {
+        evt->GetEntry(i);
+        if (evt_run == runId && evt_evt == eventId) {
+            foundEvent = true;
+            break;
+        }
     }
+    if (!foundEvent) {
+        std::cerr << "Could not find run=" << runId << " event=" << eventId << " in event tree." << std::endl;
+        return;
+    }
+
+    const double xyMin = -0.5 * lappdSizeCm;
+    const double xyMax = +0.5 * lappdSizeCm;
+    const int bins = std::max(1, static_cast<int>(lappdSizeCm / pixelCm));
+
+    if (pixelX < 0 || pixelY < 0) {
+        TH2D* hTmp = new TH2D("hTmp", "", bins, xyMin, xyMax, bins, xyMin, xyMax);
+        TString drawCmd = "y_cm:x_cm>>hTmp";
+        TString cut = Form("run==%d && evt==%d && lappd_id==%d", runId, eventId, lappd);
+        hits->Draw(drawCmd, cut, "goff");
+
+        int bx = 1, by = 1, bz = 1;
+        hTmp->GetMaximumBin(bx, by, bz);
+        pixelX = bx - 1;
+        pixelY = by - 1;
+        delete hTmp;
+    }
+
+    TCanvas *c = new TCanvas("c", "Per-event LAPPD hit map + timing", 1000, 800);
+    c->Divide(1, 2);
+
+    c->cd(1);
+    TH2D *h = new TH2D("hEvent",
+                       Form("Run %d Event %d, LAPPD %d;x [cm];y [cm];hits", runId, eventId, lappd),
+                       bins, xyMin, xyMax, bins, xyMin, xyMax);
+    TString drawCmd = "y_cm:x_cm>>hEvent";
+    TString cut = Form("run==%d && evt==%d && lappd_id==%d", runId, eventId, lappd);
+    hits->Draw(drawCmd, cut, "COLZ");
+    gPad->SetLogz();
+
+    c->cd(2);
+    TH1D *ht = new TH1D("hTime",
+                        Form("Arrival time in selected lattice space (pixel %d,%d);t_{hit}-t_{0} [ns];counts", pixelX, pixelY),
+                        200, 0, 200);
+
+    TString drawTime = Form("(t_ns-%f)>>hTime", primary_t0_ns);
+    TString cutTime = Form("run==%d && evt==%d && lappd_id==%d && pixel_x==%d && pixel_y==%d",
+                           runId, eventId, lappd, pixelX, pixelY);
+    hits->Draw(drawTime, cutTime, "HIST");
 
     c->Update();
 
+    std::cout << "Selected run=" << runId
+              << " event=" << eventId
+              << " lappd=" << lappd
+              << " pixel_x=" << pixelX
+              << " pixel_y=" << pixelY << std::endl;
 }
