@@ -3,7 +3,6 @@
 #include "G4EventAction.hh"
 
 #include "G4OpticalPhoton.hh"
-#include "G4RunManager.hh"
 #include "G4Step.hh"
 #include "G4SystemOfUnits.hh"
 #include "G4Track.hh"
@@ -19,9 +18,25 @@ void G4SteppingAction::UserSteppingAction(const G4Step* step) {
   auto* track = step->GetTrack();
   const auto* particle = track->GetDefinition();
 
+  const auto* prePV = step->GetPreStepPoint()->GetPhysicalVolume();
+  const auto* postPV = step->GetPostStepPoint()->GetPhysicalVolume();
+
+  // Save full trajectory/energy stepping for the primary particle only (muon or blip electron).
+  if (track->GetTrackID() == 1 &&
+      (particle->GetPDGEncoding() == 13 || particle->GetPDGEncoding() == -13 ||
+       particle->GetPDGEncoding() == 11 || particle->GetPDGEncoding() == -11)) {
+    const auto pos = step->GetPostStepPoint()->GetPosition();
+    fEventAction->AddPrimaryStep(particle->GetPDGEncoding(),
+                                 pos.x(),
+                                 pos.y(),
+                                 pos.z(),
+                                 step->GetPostStepPoint()->GetGlobalTime(),
+                                 step->GetPostStepPoint()->GetKineticEnergy(),
+                                 step->GetTotalEnergyDeposit());
+  }
+
   if (particle != G4OpticalPhoton::Definition()) {
-    if (step->GetPreStepPoint()->GetPhysicalVolume() != nullptr &&
-        step->GetPreStepPoint()->GetPhysicalVolume()->GetName() == "DriftWater") {
+    if (prePV != nullptr && prePV->GetName() == "DriftWater") {
       fEventAction->AddEnergyDeposit(step->GetTotalEnergyDeposit());
     }
     return;
@@ -32,8 +47,6 @@ void G4SteppingAction::UserSteppingAction(const G4Step* step) {
     fEventAction->AddGeneratedPhoton();
   }
 
-  const auto* prePV = step->GetPreStepPoint()->GetPhysicalVolume();
-  const auto* postPV = step->GetPostStepPoint()->GetPhysicalVolume();
   if (prePV == nullptr || postPV == nullptr) {
     return;
   }

@@ -6,6 +6,7 @@
 # Point-source electron blips at different positions (isotropic each event)
 /ortpc/generator/mode blip
 /ortpc/generator/blipEnergyMeV 8.0
+/ortpc/generator/blipRandomize false
 
 # Center point source
 /ortpc/generator/blipXcm 0.0

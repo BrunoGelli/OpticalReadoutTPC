@@ -21,12 +21,13 @@ A configurable primary generator is available via macro commands:
 - `/ortpc/generator/mode muon` (default) for through-going muons
 - `/ortpc/generator/mode blip` for isotropic low-energy electron blips
 - `/ortpc/generator/muonEnergyGeV <value>`
-- `/ortpc/generator/muonFromWall <true|false>`
+- `/ortpc/generator/muonRandomize <true|false>` (random phi/z on world wall)
 - `/ortpc/generator/muonWallPhiDeg <value>`
 - `/ortpc/generator/muonWallZcm <value>`
 - `/ortpc/generator/muonWallInsetCm <value>`
 - `/ortpc/generator/muonForceTransverse <true|false>` (forces dz=0)
 - `/ortpc/generator/blipEnergyMeV <value>`
+- `/ortpc/generator/blipRandomize <true|false>`
 - `/ortpc/generator/blipXcm <value>`
 - `/ortpc/generator/blipYcm <value>`
 - `/ortpc/generator/blipZcm <value>`
@@ -42,6 +43,7 @@ ROOT output (`OutPut.root`) contains:
   - hit position/time/energy on LAPPD window
   - LAPPD id (top/bottom)
   - pixelized `(pixel_x, pixel_y)` indices for downstream electronics/pulse simulation
+- `primary_steps`: full step-by-step trajectory (position/time/kinetic energy/edep) for the primary muon or blip electron
 - `config`: simulation geometry/configuration values
 
 ## Build and run
@@ -58,6 +60,7 @@ make -j
 For batch mode with a macro:
 ```bash
 ./g4Sim run.mac 1.0
+./g4Sim run.mac 1.0 8   # use 8 threads when Geant4 is built with MT
 ```
 
 If Geant4 is not in a default CMake prefix, set `Geant4_DIR` (or `CMAKE_PREFIX_PATH`) when configuring:
@@ -85,11 +88,13 @@ cmake .. -DGeant4_DIR=/path/to/lib/cmake/Geant4
 
 ## Event display with timing
 Use ROOT macro `src/EventDisplay.C` with:
-- `EventDisplay(runId, eventId, lappdId, pixelX, pixelY)`
-- If `pixelX`/`pixelY` are negative, it auto-selects the most populated pixel for that run/event/LAPPD and draws the arrival-time histogram (`t_hit - t0`) for that selected lattice/pixel space.
+- `EventDisplay(runId, eventId, showMeanTimeTop, xMinSel, xMaxSel, yMinSel, yMaxSel)`
+- top row: LAPPD maps (occupancy or mean arrival time if `showMeanTimeTop=true`)
+- bottom row: full-LAPPD arrival-time histograms; if region bounds are finite, histograms are restricted to that XY region.
 
 Example:
 ```cpp
 .x src/EventDisplay.C
-EventDisplay(0, 0, 0, 10, 12);
+EventDisplay(0, 0, false);
+EventDisplay(0, 0, true, 5.0, 10.0, -2.0, 2.0);
 ```

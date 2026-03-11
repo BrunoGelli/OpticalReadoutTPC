@@ -14,6 +14,7 @@ G4RunAction::G4RunAction(const DetectorConfig& config)
       fAnalysisInitialized(false) {
   auto* analysisManager = G4AnalysisManager::Instance();
   analysisManager->SetVerboseLevel(0);
+  analysisManager->SetNtupleMerging(true);
 }
 
 G4RunAction::~G4RunAction() {
@@ -65,6 +66,18 @@ void G4RunAction::InitializeAnalysis() {
   analysisManager->CreateNtupleIColumn("pixel_y");
   analysisManager->FinishNtuple();
 
+  analysisManager->CreateNtuple("primary_steps", "all primary particle trajectory steps");
+  analysisManager->CreateNtupleIColumn("evt");
+  analysisManager->CreateNtupleIColumn("run");
+  analysisManager->CreateNtupleIColumn("pdg");
+  analysisManager->CreateNtupleDColumn("x_cm");
+  analysisManager->CreateNtupleDColumn("y_cm");
+  analysisManager->CreateNtupleDColumn("z_cm");
+  analysisManager->CreateNtupleDColumn("t_ns");
+  analysisManager->CreateNtupleDColumn("kinetic_MeV");
+  analysisManager->CreateNtupleDColumn("edep_MeV");
+  analysisManager->FinishNtuple();
+
   analysisManager->CreateNtuple("config", "detector config");
   analysisManager->CreateNtupleDColumn("world_radius_cm");
   analysisManager->CreateNtupleDColumn("world_height_cm");
@@ -76,15 +89,15 @@ void G4RunAction::InitializeAnalysis() {
   analysisManager->CreateNtupleDColumn("lappd_pixel_cm");
   analysisManager->FinishNtuple();
 
-  analysisManager->FillNtupleDColumn(2, 0, fConfig.worldRadiusCm);
-  analysisManager->FillNtupleDColumn(2, 1, fConfig.worldHeightCm);
-  analysisManager->FillNtupleDColumn(2, 2, fConfig.lappdSizeCm);
-  analysisManager->FillNtupleDColumn(2, 3, fConfig.driftDistanceCm);
-  analysisManager->FillNtupleDColumn(2, 4, fConfig.guidePitchCm);
-  analysisManager->FillNtupleDColumn(2, 5, fConfig.wallThicknessMm);
-  analysisManager->FillNtupleDColumn(2, 6, fConfig.wallReflectivity);
-  analysisManager->FillNtupleDColumn(2, 7, fConfig.lappdPixelCm);
-  analysisManager->AddNtupleRow(2);
+  analysisManager->FillNtupleDColumn(3, 0, fConfig.worldRadiusCm);
+  analysisManager->FillNtupleDColumn(3, 1, fConfig.worldHeightCm);
+  analysisManager->FillNtupleDColumn(3, 2, fConfig.lappdSizeCm);
+  analysisManager->FillNtupleDColumn(3, 3, fConfig.driftDistanceCm);
+  analysisManager->FillNtupleDColumn(3, 4, fConfig.guidePitchCm);
+  analysisManager->FillNtupleDColumn(3, 5, fConfig.wallThicknessMm);
+  analysisManager->FillNtupleDColumn(3, 6, fConfig.wallReflectivity);
+  analysisManager->FillNtupleDColumn(3, 7, fConfig.lappdPixelCm);
+  analysisManager->AddNtupleRow(3);
 
   fAnalysisInitialized = true;
 }

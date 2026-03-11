@@ -1,10 +1,10 @@
 #include "G4EventAction.hh"
 
+#include "G4AnalysisManager.hh"
 #include "G4Event.hh"
 #include "G4Run.hh"
 #include "G4RunManager.hh"
 #include "G4SystemOfUnits.hh"
-#include "G4AnalysisManager.hh"
 
 G4EventAction::G4EventAction()
     : G4UserEventAction(),
@@ -47,11 +47,6 @@ void G4EventAction::EndOfEventAction(const G4Event* event) {
   analysisManager->FillNtupleIColumn(0, 14, fPhotonsDetectedBottom);
   analysisManager->FillNtupleIColumn(0, 15, fPhotonsDetectedTop + fPhotonsDetectedBottom);
   analysisManager->AddNtupleRow(0);
-
-  const auto printModulo = G4RunManager::GetRunManager()->GetPrintProgress();
-  if (printModulo > 0 && event->GetEventID() % printModulo == 0) {
-    G4cout << "---> End of event: " << event->GetEventID() << G4endl;
-  }
 }
 
 void G4EventAction::SetPrimaryInfo(const G4ThreeVector& position,
@@ -96,6 +91,28 @@ void G4EventAction::AddDetectedPhoton(G4int lappdId,
   analysisManager->FillNtupleIColumn(1, 8, pixelX);
   analysisManager->FillNtupleIColumn(1, 9, pixelY);
   analysisManager->AddNtupleRow(1);
+}
+
+void G4EventAction::AddPrimaryStep(G4int pdgCode,
+                                   G4double x,
+                                   G4double y,
+                                   G4double z,
+                                   G4double t,
+                                   G4double kineticEnergy,
+                                   G4double edep) {
+  auto* analysisManager = G4AnalysisManager::Instance();
+  const auto eventId = G4RunManager::GetRunManager()->GetCurrentEvent()->GetEventID();
+  const auto runId = G4RunManager::GetRunManager()->GetCurrentRun()->GetRunID();
+  analysisManager->FillNtupleIColumn(3, 0, eventId);
+  analysisManager->FillNtupleIColumn(3, 1, runId);
+  analysisManager->FillNtupleIColumn(3, 2, pdgCode);
+  analysisManager->FillNtupleDColumn(3, 3, x / cm);
+  analysisManager->FillNtupleDColumn(3, 4, y / cm);
+  analysisManager->FillNtupleDColumn(3, 5, z / cm);
+  analysisManager->FillNtupleDColumn(3, 6, t / ns);
+  analysisManager->FillNtupleDColumn(3, 7, kineticEnergy / MeV);
+  analysisManager->FillNtupleDColumn(3, 8, edep / MeV);
+  analysisManager->AddNtupleRow(3);
 }
 
 void G4EventAction::AddEnergyDeposit(G4double edep) { fEnergyDeposit += edep; }

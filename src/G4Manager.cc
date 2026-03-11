@@ -1,22 +1,39 @@
-#include "G4RunManager.hh"
-#include "G4UImanager.hh"
-
 #include "DetectorConfig.hh"
 #include "FTFP_BERT.hh"
 #include "G4ActionInitialization.hh"
 #include "G4DetectorConstruction.hh"
 #include "G4EmStandardPhysics_option1.hh"
 #include "G4OpticalPhysics.hh"
+#include "G4RunManager.hh"
 #include "G4UIExecutive.hh"
+#include "G4UImanager.hh"
 #include "G4VisExecutive.hh"
 
+#ifdef G4MULTITHREADED
+#include "G4MTRunManager.hh"
+#endif
+
+#include <cstdlib>
+
 int main(int argc, char** argv) {
+  // Usage:
+  //   ./g4Sim
+  //   ./g4Sim run.mac
+  //   ./g4Sim run.mac RIndex
+  //   ./g4Sim run.mac RIndex nThreads
+
+  G4String macroFile = "";
   G4double RIndex = 1.0;
-  if (argc == 2) {
-    RIndex = atof(argv[1]);
+  G4int nThreads = 0; // 0 -> Geant4 default
+
+  if (argc >= 2) {
+    macroFile = argv[1];
   }
-  if (argc == 3) {
-    RIndex = atof(argv[2]);
+  if (argc >= 3) {
+    RIndex = std::atof(argv[2]);
+  }
+  if (argc >= 4) {
+    nThreads = std::atoi(argv[3]);
   }
 
   DetectorConfig GeoConf = {
@@ -30,7 +47,15 @@ int main(int argc, char** argv) {
       0.6    // lappdPixelCm
   };
 
+#ifdef G4MULTITHREADED
+  auto* runManager = new G4MTRunManager;
+  if (nThreads > 0) {
+    runManager->SetNumberOfThreads(nThreads);
+  }
+#else
   auto* runManager = new G4RunManager;
+#endif
+
   runManager->SetVerboseLevel(0);
 
   auto* detConstruction = new G4DetectorConstruction(RIndex, GeoConf);
@@ -49,15 +74,14 @@ int main(int argc, char** argv) {
   runManager->Initialize();
 
   auto* uiManager = G4UImanager::GetUIpointer();
-  if (argc < 3) {
+  if (macroFile.empty()) {
     auto* ui = new G4UIExecutive(argc, argv);
     uiManager->ApplyCommand("/control/execute vis.mac");
     ui->SessionStart();
     delete ui;
   } else {
     G4String command = "/control/execute ";
-    G4String fileName = argv[1];
-    uiManager->ApplyCommand(command + fileName);
+    uiManager->ApplyCommand(command + macroFile);
   }
 
   delete visManager;

@@ -26,14 +26,16 @@ class G4PrimaryGeneratorAction : public G4VUserPrimaryGeneratorAction {
     DetectorConfig fConfig;
 
     G4String fMode;
+
     G4double fMuonEnergyGeV;
-    G4bool fMuonFromWall;
+    G4bool fMuonRandomize;
     G4double fMuonWallPhiDeg;
     G4double fMuonWallZcm;
     G4double fMuonWallInsetCm;
     G4bool fMuonForceTransverse;
 
     G4double fBlipEnergyMeV;
+    G4bool fBlipRandomize;
     G4double fBlipXcm;
     G4double fBlipYcm;
     G4double fBlipZcm;

@@ -1,6 +1,7 @@
 #ifndef G4EventAction_h
 #define G4EventAction_h 1
 
+#include "G4ThreeVector.hh"
 #include "G4UserEventAction.hh"
 #include "G4ThreeVector.hh"
 #include "globals.hh"
@@ -29,6 +30,13 @@ class G4EventAction : public G4UserEventAction {
                            G4double energy,
                            G4int pixelX,
                            G4int pixelY);
+    void AddPrimaryStep(G4int pdgCode,
+                        G4double x,
+                        G4double y,
+                        G4double z,
+                        G4double t,
+                        G4double kineticEnergy,
+                        G4double edep);
     void AddEnergyDeposit(G4double edep);
 
   private:
