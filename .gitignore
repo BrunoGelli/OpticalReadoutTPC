@@ -1,0 +1,24 @@
+# Build files
+build/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# Object files and libraries
+*.o
+*.so
+*.pcm
+*.d
+
+# Output files
+*.root
+*.out
+*.log
+*.txt
+*.csv
+
+# IDE/OS files
+.DS_Store
+*.swp
+*.bak
