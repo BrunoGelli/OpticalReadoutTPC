@@ -41,10 +41,18 @@ This project follows a Geant4 application layout.
 
 Typical run flow:
 ```bash
-mkdir build && cd build
+mkdir -p build && cd build
 cmake ..
-make
-./g4Sim run.mac
+make -j
+./g4Sim
 ```
 
-(Your local build commands may differ depending on your Geant4 setup.)
+For batch mode with a macro:
+```bash
+./g4Sim run.mac 1.0
+```
+
+If Geant4 is not in a default CMake prefix, set `Geant4_DIR` (or `CMAKE_PREFIX_PATH`) when configuring:
+```bash
+cmake .. -DGeant4_DIR=/path/to/lib/cmake/Geant4
+```
