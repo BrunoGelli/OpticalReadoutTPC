@@ -103,16 +103,16 @@ void G4EventAction::AddPrimaryStep(G4int pdgCode,
   auto* analysisManager = G4AnalysisManager::Instance();
   const auto eventId = G4RunManager::GetRunManager()->GetCurrentEvent()->GetEventID();
   const auto runId = G4RunManager::GetRunManager()->GetCurrentRun()->GetRunID();
-  analysisManager->FillNtupleIColumn(3, 0, eventId);
-  analysisManager->FillNtupleIColumn(3, 1, runId);
-  analysisManager->FillNtupleIColumn(3, 2, pdgCode);
-  analysisManager->FillNtupleDColumn(3, 3, x / cm);
-  analysisManager->FillNtupleDColumn(3, 4, y / cm);
-  analysisManager->FillNtupleDColumn(3, 5, z / cm);
-  analysisManager->FillNtupleDColumn(3, 6, t / ns);
-  analysisManager->FillNtupleDColumn(3, 7, kineticEnergy / MeV);
-  analysisManager->FillNtupleDColumn(3, 8, edep / MeV);
-  analysisManager->AddNtupleRow(3);
+  analysisManager->FillNtupleIColumn(2, 0, eventId);
+  analysisManager->FillNtupleIColumn(2, 1, runId);
+  analysisManager->FillNtupleIColumn(2, 2, pdgCode);
+  analysisManager->FillNtupleDColumn(2, 3, x / cm);
+  analysisManager->FillNtupleDColumn(2, 4, y / cm);
+  analysisManager->FillNtupleDColumn(2, 5, z / cm);
+  analysisManager->FillNtupleDColumn(2, 6, t / ns);
+  analysisManager->FillNtupleDColumn(2, 7, kineticEnergy / MeV);
+  analysisManager->FillNtupleDColumn(2, 8, edep / MeV);
+  analysisManager->AddNtupleRow(2);
 }
 
 void G4EventAction::AddEnergyDeposit(G4double edep) { fEnergyDeposit += edep; }
