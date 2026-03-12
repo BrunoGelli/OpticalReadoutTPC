@@ -91,10 +91,15 @@ Use ROOT macro `src/EventDisplay.C` with:
 - `EventDisplay(runId, eventId, showMeanTimeTop, xMinSel, xMaxSel, yMinSel, yMaxSel)`
 - top row: LAPPD maps (occupancy or mean arrival time if `showMeanTimeTop=true`)
 - bottom row: full-LAPPD arrival-time histograms; if region bounds are finite, histograms are restricted to that XY region.
+- **Click a pixel on top maps** to update the corresponding bottom-pad timing histogram to that clicked pixel region.
+
+3D overlay (true track + photon hits):
+- `EventDisplay3D(runId, eventId)`
 
 Example:
 ```cpp
 .x src/EventDisplay.C
 EventDisplay(0, 0, false);
 EventDisplay(0, 0, true, 5.0, 10.0, -2.0, 2.0);
+EventDisplay3D(0, 0);
 ```
