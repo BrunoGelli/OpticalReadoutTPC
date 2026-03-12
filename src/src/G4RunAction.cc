@@ -89,15 +89,17 @@ void G4RunAction::InitializeAnalysis() {
   analysisManager->CreateNtupleDColumn("lappd_pixel_cm");
   analysisManager->FinishNtuple();
 
-  analysisManager->FillNtupleDColumn(3, 0, fConfig.worldRadiusCm);
-  analysisManager->FillNtupleDColumn(3, 1, fConfig.worldHeightCm);
-  analysisManager->FillNtupleDColumn(3, 2, fConfig.lappdSizeCm);
-  analysisManager->FillNtupleDColumn(3, 3, fConfig.driftDistanceCm);
-  analysisManager->FillNtupleDColumn(3, 4, fConfig.guidePitchCm);
-  analysisManager->FillNtupleDColumn(3, 5, fConfig.wallThicknessMm);
-  analysisManager->FillNtupleDColumn(3, 6, fConfig.wallReflectivity);
-  analysisManager->FillNtupleDColumn(3, 7, fConfig.lappdPixelCm);
-  analysisManager->AddNtupleRow(3);
+  if (IsMaster()) {
+    analysisManager->FillNtupleDColumn(3, 0, fConfig.worldRadiusCm);
+    analysisManager->FillNtupleDColumn(3, 1, fConfig.worldHeightCm);
+    analysisManager->FillNtupleDColumn(3, 2, fConfig.lappdSizeCm);
+    analysisManager->FillNtupleDColumn(3, 3, fConfig.driftDistanceCm);
+    analysisManager->FillNtupleDColumn(3, 4, fConfig.guidePitchCm);
+    analysisManager->FillNtupleDColumn(3, 5, fConfig.wallThicknessMm);
+    analysisManager->FillNtupleDColumn(3, 6, fConfig.wallReflectivity);
+    analysisManager->FillNtupleDColumn(3, 7, fConfig.lappdPixelCm);
+    analysisManager->AddNtupleRow(3);
+  }
 
   fAnalysisInitialized = true;
 }
