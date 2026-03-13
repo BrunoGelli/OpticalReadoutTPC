@@ -14,6 +14,7 @@
 #endif
 
 #include <cstdlib>
+#include <filesystem>
 
 int main(int argc, char** argv) {
   // Usage:
@@ -76,7 +77,22 @@ int main(int argc, char** argv) {
   auto* uiManager = G4UImanager::GetUIpointer();
   if (macroFile.empty()) {
     auto* ui = new G4UIExecutive(argc, argv);
-    uiManager->ApplyCommand("/control/execute vis.mac");
+
+    // Resolve vis macro when running from either repository root or build/
+    // directory. If neither location is found, keep going so users can issue
+    // commands interactively.
+    const char* visMacro = nullptr;
+    if (std::filesystem::exists("vis.mac")) {
+      visMacro = "vis.mac";
+    } else if (std::filesystem::exists("../src/vis.mac")) {
+      visMacro = "../src/vis.mac";
+    } else if (std::filesystem::exists("src/vis.mac")) {
+      visMacro = "src/vis.mac";
+    }
+
+    if (visMacro != nullptr) {
+      uiManager->ApplyCommand(G4String("/control/execute ") + visMacro);
+    }
     ui->SessionStart();
     delete ui;
   } else {
