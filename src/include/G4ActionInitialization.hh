@@ -1,26 +1,26 @@
 #ifndef G4ActionInitialization_h
 #define G4ActionInitialization_h 1
 
-#include "G4VUserActionInitialization.hh"
 #include "DetectorConfig.hh"
+#include "G4VUserActionInitialization.hh"
 
 class G4DetectorConstruction;
 
-/// Action initialization class.
+/// Wires all Geant4 user actions for worker and master threads.
 class G4ActionInitialization : public G4VUserActionInitialization {
-    
   public:
     G4ActionInitialization(G4DetectorConstruction*, DetectorConfig& config);
-    virtual ~G4ActionInitialization();
+    ~G4ActionInitialization() override;
 
-    virtual void BuildForMaster() const;
-    virtual void Build() const;
+    /// Installs actions needed only on the master thread (run-level output control).
+    void BuildForMaster() const override;
+
+    /// Installs per-worker actions: primary generation, stepping, event and run actions.
+    void Build() const override;
 
   private:
-    G4DetectorConstruction* fDetConstruction;
-    DetectorConfig fConfig;
+    G4DetectorConstruction* fDetConstruction; ///< Geometry handle (kept for future extension).
+    DetectorConfig fConfig;                   ///< Immutable simulation configuration copy.
 };
 
 #endif
-
-    

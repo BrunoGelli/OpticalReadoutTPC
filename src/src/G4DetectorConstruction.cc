@@ -1,239 +1,209 @@
-    #include "G4DetectorConstruction.hh"
-    #include "G4Constantes.hh"
+// ORTPC simulation source file.
+// This implementation is intentionally documented to make physics/geometry
+// intent and data flow easy to follow for future development.
 
-    #include "G4Material.hh"
-    #include "G4Element.hh"
-    #include "G4NistManager.hh"
+#include "G4DetectorConstruction.hh"
+#include "G4Constantes.hh"
 
-    #include "G4Box.hh"
-    #include "G4Orb.hh"
-    #include "G4Tubs.hh"
-    #include "G4Sphere.hh"
-    #include "G4Trd.hh"
+#include "G4Box.hh"
+#include "G4LogicalSkinSurface.hh"
+#include "G4LogicalVolume.hh"
+#include "G4Material.hh"
+#include "G4MaterialPropertiesTable.hh"
+#include "G4NistManager.hh"
+#include "G4OpticalSurface.hh"
+#include "G4PVParameterised.hh"
+#include "G4PVPlacement.hh"
+#include "G4PhysicalConstants.hh"
+#include "G4SubtractionSolid.hh"
+#include "G4SystemOfUnits.hh"
+#include "G4Tubs.hh"
+#include "G4VPVParameterisation.hh"
+#include "G4VisAttributes.hh"
 
-    #include "G4LogicalVolume.hh"
-    #include "G4ThreeVector.hh"
-    #include "G4PVPlacement.hh"
-    #include "G4AutoDelete.hh"
-    #include "G4LogicalBorderSurface.hh"
-    #include "G4LogicalSkinSurface.hh"
-    #include "G4OpticalSurface.hh"
+#include <algorithm>
+#include <cmath>
+#include <cstdlib>
 
-    #include "G4SubtractionSolid.hh"
-    #include "G4VSolid.hh"
-    #include "G4UnionSolid.hh"
-    #include "G4VPVParameterisation.hh"
-    #include "G4PVParameterised.hh"
+namespace {
+constexpr G4int kNumOpticalEntries = 2;
 
+class GuideGridParameterisation : public G4VPVParameterisation {
+  public:
+    GuideGridParameterisation(G4int nX, G4int nY, G4double pitch)
+        : fNX(nX), fNY(nY), fPitch(pitch) {}
 
-    #include "G4VisAttributes.hh"
-    #include "G4Colour.hh"
+    void ComputeTransformation(G4int copyNo, G4VPhysicalVolume* physVol) const override {
+      const auto ix = copyNo % fNX;
+      const auto iy = copyNo / fNX;
 
-    #include "G4PhysicalConstants.hh"
-    #include "G4SystemOfUnits.hh"
-    #include "globals.hh"
-
-    #include "G4Navigator.hh"
-    #include "G4VPhysicalVolume.hh"
-    #include "G4TransportationManager.hh"
-
-    #include <fstream>
-    using namespace std;
-
-    #include "G4NeutronHPManager.hh"
-    #include <G4HadronicProcessStore.hh>
-    
-    //================================================================================
-
-    G4DetectorConstruction::G4DetectorConstruction (G4double RIndex, DetectorConfig& GeoConf)
-    : G4VUserDetectorConstruction(), fCheckOverlaps(true), Refr_Index(RIndex),  fConfig(GeoConf) {
-
-        G4NeutronHPManager::GetInstance()->SetVerboseLevel(0);
-        G4HadronicProcessStore::Instance()->SetVerbose(0);
-        // World
-        world_x = 400 * cm * 0.5;
-        world_y = 400 * cm * 0.5;
-        world_z = 400 * cm * 0.5;
-
-        // VLAr_x =  50 * cm * 0.5;
-        // VLAr_y =  50 * cm * 0.5;
-        // VLAr_z = 100 * cm * 0.5;
-        
-        VLAr_x =  GeoConf.sizeX * cm * 0.5;
-        VLAr_y =  GeoConf.sizeY * cm * 0.5;
-        VLAr_z =  GeoConf.sizeZ * cm * 0.5;
-
-        Pixel_x =  GeoConf.sizeX * cm * 0.5;
-        Pixel_y =  GeoConf.pixelSizeY * cm * 0.5;
-        Pixel_z =  GeoConf.pixelSizeZ * cm * 0.5;
-
+      const auto x = (-0.5 * fNX + ix + 0.5) * fPitch;
+      const auto y = (-0.5 * fNY + iy + 0.5) * fPitch;
+      physVol->SetTranslation(G4ThreeVector(x, y, 0.));
+      physVol->SetRotation(nullptr);
     }
 
-    //================================================================================
+    void ComputeDimensions(G4Box&, G4int, const G4VPhysicalVolume*) const override {}
 
-    G4DetectorConstruction::~G4DetectorConstruction (){;}
+  private:
+    G4int fNX;
+    G4int fNY;
+    G4double fPitch;
+};
 
+bool ReadBuildLatticeFlag() {
+  const char* raw = std::getenv("ORTPC_BUILD_LATTICE");
+  if (raw == nullptr) {
+    return true;
+  }
+  const auto flag = G4String(raw);
+  return !(flag == "0" || flag == "false" || flag == "FALSE" || flag == "off" || flag == "OFF");
+}
+} // namespace
 
-    //================================================================================
+G4DetectorConstruction::G4DetectorConstruction(G4double RIndex, DetectorConfig& GeoConf)
+    : G4VUserDetectorConstruction(),
+      fConfig(GeoConf),
+      fCheckOverlaps(true),
+      Refr_Index(RIndex),
+      fBuildLattice(ReadBuildLatticeFlag()),
+      fWaterLogical(nullptr),
+      fWallLogical(nullptr),
+      fLappdTopLogical(nullptr),
+      fLappdBottomLogical(nullptr) {}
 
-    class Full3DParameterisation : public G4VPVParameterisation {
-    public:
-        Full3DParameterisation(G4int nY, G4int nZ, G4double pitchY, G4double pitchZ)
-            : fNY(nY), fNZ(nZ), fPitchY(pitchY), fPitchZ(pitchZ) {}
+G4DetectorConstruction::~G4DetectorConstruction() = default;
 
-        void ComputeTransformation(G4int copyNo, G4VPhysicalVolume* physVol) const override {
-            G4int iz = copyNo / fNY;
-            G4int iy = copyNo % fNY;
+G4VPhysicalVolume* G4DetectorConstruction::Construct() {
+  DefineMaterials();
+  return DefineVolumes();
+}
 
-            G4double y = (-fNY/2.0 + iy + 0.5) * fPitchY;
-            // G4double z = (-fNZ/2.0 + iz + 0.5) * fPitchZ;
-            G4double z = (-fNZ/2.0 + iz + 0.5) * fPitchZ;
+void G4DetectorConstruction::DefineMaterials() {
+  auto* nistManager = G4NistManager::Instance();
+  auto* water = nistManager->FindOrBuildMaterial("G4_WATER");
+  nistManager->FindOrBuildMaterial("G4_Galactic");
+  nistManager->FindOrBuildMaterial("G4_Al");
+  nistManager->FindOrBuildMaterial("G4_Pyrex_Glass");
 
-            physVol->SetTranslation(G4ThreeVector(0., y, z));
-        }
+  G4double photonEnergy[kNumOpticalEntries] = {2.0 * eV, 4.2 * eV};
+  G4double waterRindex[kNumOpticalEntries] = {1.333 * Refr_Index, 1.343 * Refr_Index};
+  G4double waterAbsLength[kNumOpticalEntries] = {30. * m, 30. * m};
 
-        void ComputeDimensions(G4Box& box, G4int, const G4VPhysicalVolume*) const override {
-            // box is already defined — nothing to do here if you're using a fixed size
-        }
+  auto* waterMPT = new G4MaterialPropertiesTable();
+  waterMPT->AddProperty("RINDEX", photonEnergy, waterRindex, kNumOpticalEntries);
+  waterMPT->AddProperty("ABSLENGTH", photonEnergy, waterAbsLength, kNumOpticalEntries);
+  water->SetMaterialPropertiesTable(waterMPT);
+}
 
-    private:
-        G4int fNY;
-        G4int fNZ;
-        G4double fPitchY;
-        G4double fPitchZ;
-    };
+G4VPhysicalVolume* G4DetectorConstruction::DefineVolumes() {
+  auto* vacuum = G4Material::GetMaterial("G4_Galactic");
+  auto* water = G4Material::GetMaterial("G4_WATER");
+  auto* wallMaterial = G4Material::GetMaterial("G4_Al");
+  auto* lappdWindow = G4Material::GetMaterial("G4_Pyrex_Glass");
 
-    //================================================================================
+  const auto worldRadius = fConfig.worldRadiusCm * cm;
+  const auto worldHalfHeight = 0.5 * fConfig.worldHeightCm * cm;
+  const auto lappdHalfXY = 0.5 * fConfig.lappdSizeCm * cm;
+  const auto driftHalfZ = 0.5 * fConfig.driftDistanceCm * cm;
+  const auto wallThickness = fConfig.wallThicknessMm * mm;
+  const auto lappdWindowThickness = 3.0 * mm;
 
-    G4VPhysicalVolume* G4DetectorConstruction::Construct () {
+  auto* worldSolid = new G4Tubs(MUNDO_NOME, 0., worldRadius, worldHalfHeight, 0., twopi);
+  auto* worldLogical = new G4LogicalVolume(worldSolid, vacuum, MUNDO_NOME);
+  auto* worldPhysical =
+      new G4PVPlacement(nullptr, {}, worldLogical, MUNDO_NOME, nullptr, false, 0, fCheckOverlaps);
 
-        // Define materials 
-        DefineMaterials();
-        
-        // Define volumes
-        return DefineVolumes();
-        
-    }
+  auto* waterSolid = new G4Box("DriftWater", lappdHalfXY, lappdHalfXY, driftHalfZ);
+  fWaterLogical = new G4LogicalVolume(waterSolid, water, "DriftWater");
+  new G4PVPlacement(nullptr, {}, fWaterLogical, "DriftWater", worldLogical, false, 0, fCheckOverlaps);
 
-    //================================================================================
+  if (fBuildLattice) {
+    const auto requestedPitch = std::max(0.1 * mm, fConfig.guidePitchCm * cm);
+    const auto nCells = std::max(1, static_cast<G4int>(std::round((2.0 * lappdHalfXY) / requestedPitch)));
+    const auto pitch = (2.0 * lappdHalfXY) / nCells;
+    const auto halfCell = 0.5 * pitch;
+    const auto innerHalf = std::max(0.01 * mm, halfCell - wallThickness);
 
-    void G4DetectorConstruction::DefineMaterials() {
-        
-        G4NistManager* nistManager = G4NistManager::Instance();
+    auto* guideCellSolid = new G4Box("GuideCell", halfCell, halfCell, driftHalfZ);
+    auto* guideCellLogical = new G4LogicalVolume(guideCellSolid, water, "GuideCellLogical");
 
-        nistManager->FindOrBuildMaterial("G4_lAr");
-        nistManager->FindOrBuildMaterial("G4_Galactic");
-        nistManager->FindOrBuildMaterial("G4_URANIUM_MONOCARBIDE");
+    new G4PVParameterised("GuideCell",
+                          guideCellLogical,
+                          fWaterLogical,
+                          kUndefined,
+                          nCells * nCells,
+                          new GuideGridParameterisation(nCells, nCells, pitch),
+                          fCheckOverlaps);
 
-        // G4cout << *(G4Material::GetMaterialTable()) << G4endl;
-        
-    }
+    auto* guideOuter = new G4Box("GuideOuter", halfCell, halfCell, driftHalfZ);
+    auto* guideInner = new G4Box("GuideInner", innerHalf, innerHalf, driftHalfZ + 0.1 * mm);
+    auto* guideWallSolid = new G4SubtractionSolid("GuideWallPrism", guideOuter, guideInner);
 
-    //================================================================================
+    fWallLogical = new G4LogicalVolume(guideWallSolid, wallMaterial, "GuideWallLogical");
+    new G4PVPlacement(nullptr, {}, fWallLogical, "GuideWall", guideCellLogical, false, 0, fCheckOverlaps);
 
-    G4VPhysicalVolume* G4DetectorConstruction::DefineVolumes() {
-        // Get materials
-       
-        G4Material* Vacuo       = G4Material::GetMaterial("G4_Galactic");       
-        G4Material* LAr         = G4Material::GetMaterial("G4_lAr");
-        G4Material* HighSP      = G4Material::GetMaterial("G4_URANIUM_MONOCARBIDE");
+    G4double photonEnergy[kNumOpticalEntries] = {2.0 * eV, 4.2 * eV};
+    G4double reflectivity[kNumOpticalEntries] = {fConfig.wallReflectivity, fConfig.wallReflectivity};
+    G4double efficiency[kNumOpticalEntries] = {0.0, 0.0};
 
-    //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Construction %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    auto* wallSurfaceMPT = new G4MaterialPropertiesTable();
+    wallSurfaceMPT->AddProperty("REFLECTIVITY", photonEnergy, reflectivity, kNumOpticalEntries);
+    wallSurfaceMPT->AddProperty("EFFICIENCY", photonEnergy, efficiency, kNumOpticalEntries);
 
-    //====================== World ===========-===========
+    auto* wallOpticalSurface = new G4OpticalSurface("GuideWallOpticalSurface");
+    wallOpticalSurface->SetType(dielectric_metal);
+    wallOpticalSurface->SetModel(unified);
+    wallOpticalSurface->SetFinish(groundfrontpainted);
+    wallOpticalSurface->SetSigmaAlpha(0.05);
+    wallOpticalSurface->SetMaterialPropertiesTable(wallSurfaceMPT);
 
-        G4Box*              WorldS          = new G4Box (MUNDO_NOME, world_x, world_y, world_z);
+    new G4LogicalSkinSurface("GuideWallSkin", fWallLogical, wallOpticalSurface);
 
-        G4LogicalVolume*    WorldLV         = new G4LogicalVolume (WorldS, Vacuo, MUNDO_NOME);
+    auto* guideCellVis = new G4VisAttributes(G4Colour(0.2, 0.4, 1.0, 0.0));
+    guideCellVis->SetVisibility(false);
+    guideCellLogical->SetVisAttributes(guideCellVis);
+  }
 
-        G4VPhysicalVolume*  WorldPV         = new G4PVPlacement (0, G4ThreeVector (), WorldLV, MUNDO_NOME, 0, true, 0, fCheckOverlaps);
+  auto* lappdSolid = new G4Box("LAPPDWindow", lappdHalfXY, lappdHalfXY, lappdWindowThickness * 0.5);
+  fLappdTopLogical = new G4LogicalVolume(lappdSolid, lappdWindow, "LAPPDTopLogical");
+  fLappdBottomLogical = new G4LogicalVolume(lappdSolid, lappdWindow, "LAPPDBottomLogical");
 
-    //======================= Parametric volumes =======================
+  new G4PVPlacement(nullptr,
+                    {0., 0., driftHalfZ + 0.5 * lappdWindowThickness},
+                    fLappdTopLogical,
+                    "LAPPDTop",
+                    worldLogical,
+                    false,
+                    0,
+                    fCheckOverlaps);
+  new G4PVPlacement(nullptr,
+                    {0., 0., -driftHalfZ - 0.5 * lappdWindowThickness},
+                    fLappdBottomLogical,
+                    "LAPPDBottom",
+                    worldLogical,
+                    false,
+                    1,
+                    fCheckOverlaps);
 
-    G4int nY = VLAr_y/Pixel_y;
-    G4int nZ = VLAr_z/Pixel_z;
-    G4int nTotal = nY * nZ;
+  auto* worldVis = new G4VisAttributes(G4Colour(0.8, 0.8, 0.8, 0.05));
+  worldVis->SetVisibility(false);
+  worldLogical->SetVisAttributes(worldVis);
 
-    G4float gapsize  = 35*cm;
+  auto* waterVis = new G4VisAttributes(G4Colour(0.2, 0.4, 1.0, 0.20));
+  waterVis->SetForceSolid(true);
+  fWaterLogical->SetVisAttributes(waterVis);
 
-    // Slice volume (same dimensions for all copies)
-    auto sliceSolid = new G4Box("Slice", Pixel_x, Pixel_y, Pixel_z);
-    auto sliceLogic = new G4LogicalVolume(sliceSolid, LAr, "Slice");
+  if (fWallLogical != nullptr) {
+    auto* wallVis = new G4VisAttributes(G4Colour(0.9, 0.9, 0.9, 0.8));
+    wallVis->SetForceSolid(true);
+    fWallLogical->SetVisAttributes(wallVis);
+  }
 
-    // M0_Mother volume for stack
-    auto M0_motherSolid = new G4Box("M0_Mother", VLAr_x, VLAr_y, VLAr_z);
-    auto M0_motherLogic = new G4LogicalVolume(M0_motherSolid, Vacuo, "M0_Mother");
-    new G4PVPlacement(0, G4ThreeVector (gapsize,0,-gapsize), M0_motherLogic, "M0_Mother", WorldLV, false, 0);
+  auto* lappdVis = new G4VisAttributes(G4Colour(1.0, 0.3, 0.2, 0.9));
+  lappdVis->SetForceSolid(true);
+  fLappdTopLogical->SetVisAttributes(lappdVis);
+  fLappdBottomLogical->SetVisAttributes(lappdVis);
 
-
-    new G4PVParameterised("Prisms_M0",
-                          sliceLogic,
-                          M0_motherLogic,
-                          kUndefined,  // Not tied to a single axis
-                          nTotal,
-                          new Full3DParameterisation(nY, nZ, Pixel_y*2, Pixel_z*2));
-
-
-    // M1_Mother volume for stack
-    auto M1_motherSolid = new G4Box("M1_Mother", VLAr_x, VLAr_y, VLAr_z);
-    auto M1_motherLogic = new G4LogicalVolume(M0_motherSolid, Vacuo, "M1_Mother");
-    new G4PVPlacement(0, G4ThreeVector (-gapsize,0,-gapsize), M1_motherLogic, "M1_Mother", WorldLV, false, 0);
-
-
-    new G4PVParameterised("Prisms_M1",
-                          sliceLogic,
-                          M1_motherLogic,
-                          kUndefined,  // Not tied to a single axis
-                          nTotal,
-                          new Full3DParameterisation(nY, nZ, Pixel_y*2, Pixel_z*2));
-
-
-    // M0_Mother volume for stack
-    auto M2_motherSolid = new G4Box("M2_Mother", VLAr_x, VLAr_y, VLAr_z);
-    auto M2_motherLogic = new G4LogicalVolume(M2_motherSolid, Vacuo, "M2_Mother");
-    new G4PVPlacement(0, G4ThreeVector (gapsize,0,gapsize), M2_motherLogic, "M2_Mother", WorldLV, false, 0);
-
-
-    new G4PVParameterised("Prisms_M2",
-                          sliceLogic,
-                          M2_motherLogic,
-                          kUndefined,  // Not tied to a single axis
-                          nTotal,
-                          new Full3DParameterisation(nY, nZ, Pixel_y*2, Pixel_z*2));
-
-
-    // M0_Mother volume for stack
-    auto M3_motherSolid = new G4Box("M3_Mother", VLAr_x, VLAr_y, VLAr_z);
-    auto M3_motherLogic = new G4LogicalVolume(M3_motherSolid, Vacuo, "M3_Mother");
-    new G4PVPlacement(0, G4ThreeVector (-gapsize,0,gapsize), M3_motherLogic, "M3_Mother", WorldLV, false, 0);
-
-
-    new G4PVParameterised("Prisms_M3",
-                          sliceLogic,
-                          M3_motherLogic,
-                          kUndefined,  // Not tied to a single axis
-                          nTotal,
-                          new Full3DParameterisation(nY, nZ, Pixel_y*2, Pixel_z*2));
-
-
-
-
-
-        G4VisAttributes* grey  = new G4VisAttributes (G4Colour (0.5, 0.5, 0.5, 0.8));
-        G4VisAttributes* blue  = new G4VisAttributes (G4Colour (0.5, 0.5, 1.0, 0.8));
-        G4VisAttributes* red   = new G4VisAttributes (G4Colour (1.0, 0.5, 0.5, 0.8));
-        G4VisAttributes* green = new G4VisAttributes (G4Colour (0.5, 1.0, 0.5, 0.8));
-        grey->SetForceSolid (true);
-        blue->SetForceSolid (true);
-        red->SetForceSolid (true);
-        green->SetForceSolid (true);
-        M0_motherLogic->SetVisAttributes(grey);
-        M1_motherLogic->SetVisAttributes(blue);
-        M2_motherLogic->SetVisAttributes(red);
-        M3_motherLogic->SetVisAttributes(green);
-
-        return WorldPV;
-
-
-        
-    }
+  return worldPhysical;
+}

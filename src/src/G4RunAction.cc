@@ -1,132 +1,137 @@
-#include "G4Timer.hh"
+// ORTPC simulation source file.
+// This implementation is intentionally documented to make physics/geometry
+// intent and data flow easy to follow for future development.
 
 #include "G4RunAction.hh"
-#include "G4Constantes.hh"
 
+#include "G4AnalysisManager.hh"
 #include "G4Run.hh"
-#include "G4RunManager.hh"
-#include "G4EventManager.hh"
-#include "g4root.hh"
+#include "G4Threading.hh"
+#include "G4Timer.hh"
 
+#include <atomic>
 
-#include <fstream>
-
-// #include "G4NeutronHPManager.hh"
-
-using namespace std;
-
-//================================================================================
-
-G4RunAction::G4RunAction(const DetectorConfig& config) : G4UserRunAction(), fConfig(config) {
-    
-    timer = new G4Timer;
-    nOfReflections_Total = 0;
-    nOfDetections_Total = 0;
-    TOF_Detections_Total = 0;
+namespace {
+std::atomic<bool> gConfigRowWritten{false};
 }
 
-//================================================================================
+G4RunAction::G4RunAction(const DetectorConfig& config)
+    : G4UserRunAction(),
+      nOfReflections_Total(0),
+      nOfDetections_Total(0),
+      TOF_Detections_Total(0),
+      timer(new G4Timer),
+      fConfig(config),
+      fAnalysisInitialized(false),
+      fEventNtupleId(-1),
+      fPhotonHitsNtupleId(-1),
+      fPrimaryStepsNtupleId(-1),
+      fConfigNtupleId(-1) {
+  auto* analysisManager = G4AnalysisManager::Instance();
+  analysisManager->SetVerboseLevel(0);
+  analysisManager->SetFirstNtupleId(0);
+  analysisManager->SetNtupleMerging(true);
+}
 
 G4RunAction::~G4RunAction() {
-    
-    delete timer;
-  
-}
-
-//================================================================================
-
-void G4RunAction::BeginOfRunAction(const G4Run* aRun) {
-    
-    // G4NeutronHPManager::GetInstance()->SetVerboseLevel(0);
-
-
-    G4cout << "### Run " << aRun->GetRunID() << " start." << G4endl;
-
-    G4AnalysisManager* analysisManager = G4AnalysisManager::Instance();
-    
-    G4cout << "Using " << analysisManager->GetType() << " analysis manager." << G4endl;
-    timer->Start();
-
-    analysisManager->OpenFile("OutPut");
-    analysisManager->SetVerboseLevel(0);
-
-
-    // Indica o id do primeiro histograma criado -- default = 0
-    analysisManager->SetFirstHistoId(1);
-    // Cria histogramas    -- (nome, titulo, nbins, xmin, xmax)
-    analysisManager->CreateH1("0","Time of arrival",5000,0.,10);
-
-
-    // Indica o id da primeira ntuple criada -- default = 0
-    analysisManager->SetFirstNtupleId(1);
-    //Declara ntuples
-    analysisManager->CreateNtuple("ntuple", "data");
-    analysisManager->CreateNtupleIColumn("evt");
-    analysisManager->CreateNtupleDColumn("x");
-    analysisManager->CreateNtupleDColumn("y");
-    analysisManager->CreateNtupleDColumn("z");
-    analysisManager->CreateNtupleDColumn("t");
-    analysisManager->CreateNtupleDColumn("energy");
-    analysisManager->CreateNtupleDColumn("theta");
-    analysisManager->CreateNtupleDColumn("dx");
-    analysisManager->CreateNtupleDColumn("dy");
-    analysisManager->CreateNtupleDColumn("dz");
-    analysisManager->CreateNtupleIColumn("module");
-
-    analysisManager->FinishNtuple();
-
-    // Second ntuple (detector config)
-    analysisManager->CreateNtuple("config", "detector config");
-    analysisManager->CreateNtupleIColumn("sizeX");
-    analysisManager->CreateNtupleIColumn("sizeY");
-    analysisManager->CreateNtupleIColumn("sizeZ");
-    analysisManager->CreateNtupleDColumn("pixelSizeY");
-    analysisManager->CreateNtupleDColumn("pixelSizeZ");
-    analysisManager->FinishNtuple();
-
-    // Fill the config ntuple once per run
-    analysisManager->FillNtupleIColumn(2, 0, fConfig.sizeX);
-    analysisManager->FillNtupleIColumn(2, 1, fConfig.sizeY);
-    analysisManager->FillNtupleIColumn(2, 2, fConfig.sizeZ);
-    analysisManager->FillNtupleDColumn(2, 3, fConfig.pixelSizeY);
-    analysisManager->FillNtupleDColumn(2, 4, fConfig.pixelSizeZ);
-    analysisManager->AddNtupleRow(2);
-
-}
-
-//================================================================================
-
-void G4RunAction::EndOfRunAction(const G4Run* aRun) {
-    G4cout << "End of run." << G4endl;
-    timer->Stop();
-
-    G4AnalysisManager* analysisManager = G4AnalysisManager::Instance();
-
-
-
-//     // Get the actual TFile from G4AnalysisManager (if using ROOT)
-//     TFile* file = (TFile*) analysisManager->GetFile();
-
-
-// // struct DetectorConfig {
-// //     int sizeX, sizeY, sizeZ;
-// //     int pixelSizeY, pixelSizeZ;
-// // };
-//     if (file) {
-//         file->cd();
-//         file->WriteObject(new TParameter<int>("sizeX", config.sizeX), "sizeX");
-//         file->WriteObject(new TParameter<int>("sizeY", config.sizeY), "sizeY");
-//         file->WriteObject(new TParameter<int>("sizeZ", config.sizeZ), "sizeZ");
-//         file->WriteObject(new TParameter<int>("pixelSizeY", config.pixelSizeY), "pixelSizeY");
-//         file->WriteObject(new TParameter<int>("pixelSizeZ", config.pixelSizeZ), "pixelSizeZ");
-//     }
-
-
+  auto* analysisManager = G4AnalysisManager::Instance();
+  if (fAnalysisInitialized) {
     analysisManager->Write();
     analysisManager->CloseFile();
-
-    delete G4AnalysisManager::Instance();
-        
+  }
+  delete timer;
 }
 
-//================================================================================
+void G4RunAction::InitializeAnalysis() {
+  if (fAnalysisInitialized) {
+    return;
+  }
+
+  auto* analysisManager = G4AnalysisManager::Instance();
+  analysisManager->OpenFile("OutPut.root");
+
+  fEventNtupleId = analysisManager->CreateNtuple("event", "event truth summary");
+  analysisManager->CreateNtupleIColumn(fEventNtupleId, "evt");
+  analysisManager->CreateNtupleIColumn(fEventNtupleId, "run");
+  analysisManager->CreateNtupleIColumn(fEventNtupleId, "primary_pdg");
+  analysisManager->CreateNtupleDColumn(fEventNtupleId, "primary_x_cm");
+  analysisManager->CreateNtupleDColumn(fEventNtupleId, "primary_y_cm");
+  analysisManager->CreateNtupleDColumn(fEventNtupleId, "primary_z_cm");
+  analysisManager->CreateNtupleDColumn(fEventNtupleId, "dir_x");
+  analysisManager->CreateNtupleDColumn(fEventNtupleId, "dir_y");
+  analysisManager->CreateNtupleDColumn(fEventNtupleId, "dir_z");
+  analysisManager->CreateNtupleDColumn(fEventNtupleId, "primary_energy_MeV");
+  analysisManager->CreateNtupleDColumn(fEventNtupleId, "primary_t0_ns");
+  analysisManager->CreateNtupleDColumn(fEventNtupleId, "edep_water_MeV");
+  analysisManager->CreateNtupleIColumn(fEventNtupleId, "n_photons_generated");
+  analysisManager->CreateNtupleIColumn(fEventNtupleId, "n_hits_top");
+  analysisManager->CreateNtupleIColumn(fEventNtupleId, "n_hits_bottom");
+  analysisManager->CreateNtupleIColumn(fEventNtupleId, "n_hits_total");
+  analysisManager->FinishNtuple(fEventNtupleId);
+
+  fPhotonHitsNtupleId = analysisManager->CreateNtuple("photon_hits", "photon and MC-like pixel hit information");
+  analysisManager->CreateNtupleIColumn(fPhotonHitsNtupleId, "evt");
+  analysisManager->CreateNtupleIColumn(fPhotonHitsNtupleId, "run");
+  analysisManager->CreateNtupleIColumn(fPhotonHitsNtupleId, "lappd_id");
+  analysisManager->CreateNtupleDColumn(fPhotonHitsNtupleId, "x_cm");
+  analysisManager->CreateNtupleDColumn(fPhotonHitsNtupleId, "y_cm");
+  analysisManager->CreateNtupleDColumn(fPhotonHitsNtupleId, "z_cm");
+  analysisManager->CreateNtupleDColumn(fPhotonHitsNtupleId, "t_ns");
+  analysisManager->CreateNtupleDColumn(fPhotonHitsNtupleId, "energy_eV");
+  analysisManager->CreateNtupleIColumn(fPhotonHitsNtupleId, "pixel_x");
+  analysisManager->CreateNtupleIColumn(fPhotonHitsNtupleId, "pixel_y");
+  analysisManager->FinishNtuple(fPhotonHitsNtupleId);
+
+  fPrimaryStepsNtupleId = analysisManager->CreateNtuple("primary_steps", "all primary particle trajectory steps");
+  analysisManager->CreateNtupleIColumn(fPrimaryStepsNtupleId, "evt");
+  analysisManager->CreateNtupleIColumn(fPrimaryStepsNtupleId, "run");
+  analysisManager->CreateNtupleIColumn(fPrimaryStepsNtupleId, "pdg");
+  analysisManager->CreateNtupleDColumn(fPrimaryStepsNtupleId, "x_cm");
+  analysisManager->CreateNtupleDColumn(fPrimaryStepsNtupleId, "y_cm");
+  analysisManager->CreateNtupleDColumn(fPrimaryStepsNtupleId, "z_cm");
+  analysisManager->CreateNtupleDColumn(fPrimaryStepsNtupleId, "t_ns");
+  analysisManager->CreateNtupleDColumn(fPrimaryStepsNtupleId, "kinetic_MeV");
+  analysisManager->CreateNtupleDColumn(fPrimaryStepsNtupleId, "edep_MeV");
+  analysisManager->FinishNtuple(fPrimaryStepsNtupleId);
+
+  fConfigNtupleId = analysisManager->CreateNtuple("config", "detector config");
+  analysisManager->CreateNtupleDColumn(fConfigNtupleId, "world_radius_cm");
+  analysisManager->CreateNtupleDColumn(fConfigNtupleId, "world_height_cm");
+  analysisManager->CreateNtupleDColumn(fConfigNtupleId, "lappd_size_cm");
+  analysisManager->CreateNtupleDColumn(fConfigNtupleId, "drift_distance_cm");
+  analysisManager->CreateNtupleDColumn(fConfigNtupleId, "guide_pitch_cm");
+  analysisManager->CreateNtupleDColumn(fConfigNtupleId, "wall_thickness_mm");
+  analysisManager->CreateNtupleDColumn(fConfigNtupleId, "wall_reflectivity");
+  analysisManager->CreateNtupleDColumn(fConfigNtupleId, "lappd_pixel_cm");
+  analysisManager->FinishNtuple(fConfigNtupleId);
+
+  fAnalysisInitialized = true;
+}
+
+void G4RunAction::BeginOfRunAction(const G4Run* aRun) {
+  G4cout << "### Run " << aRun->GetRunID() << " start." << G4endl;
+  InitializeAnalysis();
+
+  if (!IsMaster()) {
+    bool expected = false;
+    if (gConfigRowWritten.compare_exchange_strong(expected, true)) {
+      auto* analysisManager = G4AnalysisManager::Instance();
+      analysisManager->FillNtupleDColumn(fConfigNtupleId, 0, fConfig.worldRadiusCm);
+      analysisManager->FillNtupleDColumn(fConfigNtupleId, 1, fConfig.worldHeightCm);
+      analysisManager->FillNtupleDColumn(fConfigNtupleId, 2, fConfig.lappdSizeCm);
+      analysisManager->FillNtupleDColumn(fConfigNtupleId, 3, fConfig.driftDistanceCm);
+      analysisManager->FillNtupleDColumn(fConfigNtupleId, 4, fConfig.guidePitchCm);
+      analysisManager->FillNtupleDColumn(fConfigNtupleId, 5, fConfig.wallThicknessMm);
+      analysisManager->FillNtupleDColumn(fConfigNtupleId, 6, fConfig.wallReflectivity);
+      analysisManager->FillNtupleDColumn(fConfigNtupleId, 7, fConfig.lappdPixelCm);
+      analysisManager->AddNtupleRow(fConfigNtupleId);
+      G4cout << "### Config ntuple row written by worker thread " << G4Threading::G4GetThreadId() << G4endl;
+    }
+  }
+}
+
+void G4RunAction::EndOfRunAction(const G4Run*) {
+  // Intentionally empty.
+  // Multiple /run/beamOn commands in one macro are supported;
+  // output is written once in the destructor at application shutdown.
+}

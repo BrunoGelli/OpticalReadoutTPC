@@ -1,48 +1,38 @@
 #ifndef G4DetectorConstruction_h
 #define G4DetectorConstruction_h 1
 
+#include "DetectorConfig.hh"
 #include "G4VUserDetectorConstruction.hh"
 #include "globals.hh"
-#include "DetectorConfig.hh"
 
+class G4LogicalVolume;
 class G4VPhysicalVolume;
 
-
-  // struct DetectorConfig {
-  // int sizeX, sizeY, sizeZ;
-  // int pixelSizeY, pixelSizeZ;
-  // };
-
-class G4DetectorConstruction : public G4VUserDetectorConstruction
-{
+/// Builds ORTPC geometry, materials, and optical surfaces.
+class G4DetectorConstruction : public G4VUserDetectorConstruction {
   public:
     G4DetectorConstruction(G4double RIndex, DetectorConfig& GeoConf);
-    virtual ~G4DetectorConstruction();
+    ~G4DetectorConstruction() override;
 
-  public:
-    virtual G4VPhysicalVolume* Construct();
+    /// Geant4 entry point for geometry/material construction.
+    G4VPhysicalVolume* Construct() override;
 
   private:
-    // methods
-    //
+    /// Defines materials and their optical properties.
     void DefineMaterials();
+
+    /// Creates full detector volume hierarchy.
     G4VPhysicalVolume* DefineVolumes();
 
-    DetectorConfig fConfig;
+    DetectorConfig fConfig;       ///< Detector dimensions/readout config.
+    G4bool fCheckOverlaps;        ///< Enables overlap checks at placement time.
+    G4double Refr_Index;          ///< Optional global water index scaling.
+    G4bool fBuildLattice;         ///< Runtime switch to enable/disable guide lattice.
 
-
-    // World
-    G4double world_x, world_y, world_z;
-
-    G4double VLAr_x, VLAr_y, VLAr_z;
-
-    G4double Pixel_x, Pixel_y, Pixel_z;
-
-    G4double clearance;
-
-    G4bool  fCheckOverlaps; // option to activate checking of volumes overlaps
-
-    G4double Refr_Index;
+    G4LogicalVolume* fWaterLogical;      ///< Water drift logical volume.
+    G4LogicalVolume* fWallLogical;       ///< Guide wall logical volume.
+    G4LogicalVolume* fLappdTopLogical;   ///< Top LAPPD logical volume.
+    G4LogicalVolume* fLappdBottomLogical;///< Bottom LAPPD logical volume.
 };
 
 #endif /*G4DetectorConstruction_h*/
