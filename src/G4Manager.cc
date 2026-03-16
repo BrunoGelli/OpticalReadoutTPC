@@ -46,10 +46,10 @@ int main(int argc, char** argv) {
       50.0,  // worldRadiusCm
       100.0, // worldHeightCm
       50.0,  // lappdSizeCm
-      80.0,  // driftDistanceCm
+      100.0,  // driftDistanceCm
       5.0,   // guidePitchCm
       1.0,   // wallThicknessMm
-      0.97,  // wallReflectivity
+      0.99,  // wallReflectivity
       0.6    // lappdPixelCm
   };
 
