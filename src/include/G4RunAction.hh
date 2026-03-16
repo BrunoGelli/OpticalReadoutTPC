@@ -8,6 +8,7 @@
 class G4Run;
 class G4Timer;
 
+/// Owns analysis-file lifecycle and ntuple booking for the run.
 class G4RunAction : public G4UserRunAction {
   public:
     explicit G4RunAction(const DetectorConfig& config);
@@ -21,12 +22,14 @@ class G4RunAction : public G4UserRunAction {
     G4double TOF_Detections_Total;
 
   private:
+    /// Creates output file and all ntuples (once per process).
     void InitializeAnalysis();
 
     G4Timer* timer;
     DetectorConfig fConfig;
     G4bool fAnalysisInitialized;
 
+    // Explicit ntuple IDs avoid hard-coded assumptions in MT mode.
     G4int fEventNtupleId;
     G4int fPhotonHitsNtupleId;
     G4int fPrimaryStepsNtupleId;

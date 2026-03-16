@@ -1,112 +1,160 @@
 # Optical Readout TPC toy simulation (Geant4)
 
-This repository now implements a configurable **water Cherenkov light-guide volume** with:
-- Cylindrical world (~1 m diameter x 1 m height default)
-- Two square LAPPD windows (top and bottom, 50 cm x 50 cm active area)
-- High-reflectivity internal wall lattice that guides photons toward the LAPPDs
+This repository implements a configurable **optical-readout TPC toy model** with a water Cherenkov drift region, guide-cell optics, LAPPD readout, and ROOT-based event displays for timing reconstruction studies.
 
-## Geometry and configurable parameters
-Defaults are defined in `src/G4Manager.cc` through `DetectorConfig`:
-- `worldRadiusCm`
-- `worldHeightCm`
-- `lappdSizeCm`
-- `driftDistanceCm` (distance between top/bottom LAPPDs)
-- `guidePitchCm` (center-to-center guide pitch; grid is adjusted to exactly tile the LAPPD)
-- `wallThicknessMm` (single-prism wall thickness; neighboring prisms make an effective 2x wall between channels)
-- `wallReflectivity`
-- `lappdPixelCm` (MC-like pixelization used for hit output)
+---
 
-## Primary event modes
-A configurable primary generator is available via macro commands:
-- `/ortpc/generator/mode muon` (default) for through-going muons
-- `/ortpc/generator/mode blip` for isotropic low-energy electron blips
-- `/ortpc/generator/muonEnergyGeV <value>`
-- `/ortpc/generator/muonRandomize <true|false>` (random phi/z on world wall)
-- `/ortpc/generator/muonWallPhiDeg <value>`
-- `/ortpc/generator/muonWallZcm <value>`
-- `/ortpc/generator/muonWallInsetCm <value>`
-- `/ortpc/generator/muonForceTransverse <true|false>` (forces dz=0)
-- `/ortpc/generator/blipEnergyMeV <value>`
-- `/ortpc/generator/blipRandomize <true|false>`
-- `/ortpc/generator/blipXcm <value>`
-- `/ortpc/generator/blipYcm <value>`
-- `/ortpc/generator/blipZcm <value>`
+## Highlights
 
-## Output
-ROOT output (`OutPut.root`) contains:
-- `event`: truth-like per-event summary
-  - run/event id + primary position/direction/energy/time-zero
-  - energy deposition in water
-  - number of Cherenkov photons generated
-  - number of photons detected in each LAPPD
-- `photon_hits`: per-photon hit information
-  - hit position/time/energy on LAPPD window
-  - LAPPD id (top/bottom)
-  - pixelized `(pixel_x, pixel_y)` indices for downstream electronics/pulse simulation
-- `primary_steps`: full step-by-step trajectory (position/time/kinetic energy/edep) for the primary muon or blip electron
-- `config`: simulation geometry/configuration values
+- Cylindrical world + square drift/water region.
+- Top and bottom square LAPPD windows.
+- Parameterized light-guide lattice (fast to build/visualize, suitable for large copy counts).
+- Configurable primary generator (`muon`, `blip`) via Geant4 messenger.
+- ROOT output with event-level truth, photon hits, and full primary steps.
+- Interactive ROOT event display with:
+  - synchronized cell-click timing views,
+  - intrinsic timing-based 3D reconstruction,
+  - per-point uncertainty bars,
+  - line fit through reconstructed points and fit-quality diagnostics.
+
+---
+
+## Detector configuration
+
+Defaults are set in `src/G4Manager.cc` through `DetectorConfig`.
+
+| Field | Meaning |
+|---|---|
+| `worldRadiusCm` | Cylindrical world radius |
+| `worldHeightCm` | Cylindrical world full height |
+| `lappdSizeCm` | LAPPD active square size |
+| `driftDistanceCm` | Distance between top/bottom LAPPDs |
+| `guidePitchCm` | Nominal guide-cell pitch (retiled to fill full area) |
+| `wallThicknessMm` | Hollow prism wall thickness |
+| `wallReflectivity` | Reflective wall coefficient |
+| `lappdPixelCm` | Hit pixelization used in analysis output |
+
+---
+
+## Primary generator modes
+
+Runtime control through `/ortpc/generator/*` commands:
+
+- `/ortpc/generator/mode muon` (default)
+- `/ortpc/generator/mode blip`
+
+Muon controls:
+- `/ortpc/generator/muonEnergyGeV`
+- `/ortpc/generator/muonRandomize`
+- `/ortpc/generator/muonWallPhiDeg`
+- `/ortpc/generator/muonWallZcm`
+- `/ortpc/generator/muonWallInsetCm`
+- `/ortpc/generator/muonForceTransverse`
+
+Blip controls:
+- `/ortpc/generator/blipEnergyMeV`
+- `/ortpc/generator/blipRandomize`
+- `/ortpc/generator/blipXcm`, `/blipYcm`, `/blipZcm`
+
+---
+
+## Output file (`OutPut.root`)
+
+- `event`: per-event truth summary (primary info, edep, generated/detected counters)
+- `photon_hits`: per-hit position/time/energy + LAPPD id + pixel indices
+- `primary_steps`: full primary trajectory/energy-loss stepping
+- `config`: geometry/config values written for downstream reproducibility
+
+---
 
 ## Build and run
-This project follows a Geant4 application layout.
 
-Typical run flow:
 ```bash
-mkdir -p build && cd build
+mkdir -p build
+cd build
 cmake ..
 make -j
+```
+
+Interactive:
+```bash
 ./g4Sim
 ```
 
-For batch mode with a macro:
+Batch:
 ```bash
 ./g4Sim run.mac 1.0
-./g4Sim run.mac 1.0 8   # use 8 threads when Geant4 is built with MT
+./g4Sim run.mac 1.0 8   # 8 threads if Geant4 is MT-enabled
 ```
 
-If Geant4 is not in a default CMake prefix, set `Geant4_DIR` (or `CMAKE_PREFIX_PATH`) when configuring:
+If Geant4 is not discoverable:
 ```bash
 cmake .. -DGeant4_DIR=/path/to/lib/cmake/Geant4
 ```
 
-
-## Suggested workflow
-1. **Build once** in a separate build directory.
-2. **Run in GUI** to inspect geometry:
-   ```bash
-   ./g4Sim
-   ```
-3. **Run batch muons**:
-   ```bash
-   ./g4Sim ../src/run_muon.mac 1.0
-   ```
-4. **Run batch point sources** (multiple blip source positions):
-   ```bash
-   ./g4Sim ../src/run_point_sources.mac 1.0
-   ```
-5. Inspect `OutPut.root` (`event`, `photon_hits`, `config`) and optionally use `src/EventDisplay.C`.
-
-
-## Event display with timing
-Use ROOT macro `src/EventDisplay.C` with:
-- `EventDisplay(runId, eventId, showMeanTimeTop, xMinSel, xMaxSel, yMinSel, yMaxSel)`
-- top row: LAPPD maps (occupancy or mean arrival time if `showMeanTimeTop=true`)
-- bottom row: full-LAPPD arrival-time histograms; if region bounds are finite, histograms are restricted to that XY region.
-- **Click a pixel on top maps** to update the corresponding bottom-pad timing histogram to that clicked pixel region.
-
-3D overlay (true track + photon hits):
-- `EventDisplay3D(runId, eventId)`
-
-Example:
-```cpp
-.x src/EventDisplay.C
-EventDisplay(0, 0, false);
-EventDisplay(0, 0, true, 5.0, 10.0, -2.0, 2.0);
-EventDisplay3D(0, 0);
-```
-
-### GUI/geometry debugging tip
-If you want to quickly check visualization without building the guide lattice, disable it with:
+### GUI debugging tip
+Disable the guide lattice quickly:
 ```bash
 ORTPC_BUILD_LATTICE=0 ./g4Sim
 ```
-By default, the lattice is enabled (`ORTPC_BUILD_LATTICE=1` or unset).
+(Default is enabled.)
+
+---
+
+## Event display workflow (`src/EventDisplay.C`)
+
+### 2D display
+
+```cpp
+.x src/EventDisplay.C
+EventDisplay(0, 0, false);
+```
+
+- Top row: occupancy or mean-time maps.
+- Bottom row: top/bottom LAPPD timing spectra.
+- Clicking on either top map snaps to the **guide cell** and updates **both** bottom plots in sync.
+
+### 3D display + reconstruction
+
+```cpp
+EventDisplay3D(0, 0);                 // default estimator: p10
+EventDisplay3D(0, 0, "first");       // first photon (100 ps timing sigma)
+EventDisplay3D(0, 0, "mean");
+EventDisplay3D(0, 0, "median");
+EventDisplay3D(0, 0, "p10", 0.10);   // mean of earliest 10%
+```
+
+#### Reconstruction model
+Per cell (x,y):
+
+- Estimate `t_top` and `t_bottom` from selected timing estimator.
+- Compute effective speed:
+  - `v_eff = L / (t_top + t_bottom)`
+- Reconstruct z:
+  - `z_reco = 0.5 * v_eff * (t_bottom - t_top)`
+
+where `L = driftDistanceCm`.
+
+#### Uncertainty
+- Timing uncertainty depends on estimator.
+- For `first`, fixed `100 ps` is used.
+- Propagated `sigma_z` is shown as vertical uncertainty bars at each reco point.
+
+#### Muon fit diagnostics
+For muon events (PDG ±13), a 3D line is fit through reconstructed points and compared against true-track fit:
+
+- centroid offsets: `dx, dy, dz`
+- direction/angle error
+- residual chi-square summary (`x`, `y`, `z`, and combined `chi2/ndf`)
+
+All diagnostics are shown in the legend.
+
+---
+
+## Example macros
+
+- `src/optPhoton.mac`
+- `src/run_muon.mac`
+- `src/run_point_sources.mac`
+
+These provide quick entry points for validation and demonstration.

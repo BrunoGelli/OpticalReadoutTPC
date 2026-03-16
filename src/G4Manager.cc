@@ -1,3 +1,7 @@
+// ORTPC simulation source file.
+// This implementation is intentionally documented to make physics/geometry
+// intent and data flow easy to follow for future development.
+
 #include "DetectorConfig.hh"
 #include "FTFP_BERT.hh"
 #include "G4ActionInitialization.hh"

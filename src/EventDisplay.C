@@ -419,10 +419,14 @@ void EventDisplay3D(int runId = 0, int eventId = 0, const char* timeEstimator = 
   }
 
   std::string fitText;
+  LineFit3D recoFit;
+  LineFit3D trueFit;
+  bool haveRecoFit = false;
   if ((primary_pdg == 13 || primary_pdg == -13) && recoX.size() >= 2 && tx.size() >= 2) {
-    const LineFit3D recoFit = FitLinePCA(recoX, recoY, recoZ);
-    const LineFit3D trueFit = FitLinePCA(tx, ty, tz);
+    recoFit = FitLinePCA(recoX, recoY, recoZ);
+    trueFit = FitLinePCA(tx, ty, tz);
     if (recoFit.ok && trueFit.ok) {
+      haveRecoFit = true;
       const double posErrX = recoFit.c[0] - trueFit.c[0];
       const double posErrY = recoFit.c[1] - trueFit.c[1];
       const double posErrZ = recoFit.c[2] - trueFit.c[2];
@@ -447,12 +451,27 @@ void EventDisplay3D(int runId = 0, int eventId = 0, const char* timeEstimator = 
     }
   }
 
+  TPolyLine3D* recoLine = nullptr;
+  if (haveRecoFit) {
+    recoLine = new TPolyLine3D(2);
+    const double tSpan = 0.65 * driftDistanceCm;
+    recoLine->SetPoint(0, recoFit.c[0] - tSpan * recoFit.u[0], recoFit.c[1] - tSpan * recoFit.u[1],
+                       recoFit.c[2] - tSpan * recoFit.u[2]);
+    recoLine->SetPoint(1, recoFit.c[0] + tSpan * recoFit.u[0], recoFit.c[1] + tSpan * recoFit.u[1],
+                       recoFit.c[2] + tSpan * recoFit.u[2]);
+    recoLine->SetLineColor(kMagenta + 3);
+    recoLine->SetLineWidth(3);
+    recoLine->SetLineStyle(1);
+    recoLine->Draw("same");
+  }
+
   auto* leg = new TLegend(0.10, 0.60, 0.88, 0.92);
   leg->SetFillStyle(0);
   if (trk) leg->AddEntry(trk, "Primary true track", "l");
   if (mkTop) leg->AddEntry(mkTop, "LAPPD top photon hits", "p");
   if (mkBottom) leg->AddEntry(mkBottom, "LAPPD bottom photon hits", "p");
   if (mkReco) leg->AddEntry(mkReco, Form("z_{reco} points (%s, v_{eff}=L/(t_{top}+t_{bottom}))", est.c_str()), "p");
+  if (recoLine) leg->AddEntry(recoLine, "Line fit through reconstructed points", "l");
   leg->AddEntry((TObject*)nullptr, "Magenta bars: propagated #sigma_{z}", "");
   if (!fitText.empty()) leg->AddEntry((TObject*)nullptr, fitText.c_str(), "");
   leg->Draw();

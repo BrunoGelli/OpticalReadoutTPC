@@ -1,3 +1,7 @@
+// ORTPC simulation source file.
+// This implementation is intentionally documented to make physics/geometry
+// intent and data flow easy to follow for future development.
+
 #include "G4PrimaryGeneratorAction.hh"
 
 #include "G4Event.hh"
