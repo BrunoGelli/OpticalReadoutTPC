@@ -5,44 +5,29 @@
 #include "globals.hh"
 #include "DetectorConfig.hh"
 
+class G4LogicalVolume;
 class G4VPhysicalVolume;
 
-
-  // struct DetectorConfig {
-  // int sizeX, sizeY, sizeZ;
-  // int pixelSizeY, pixelSizeZ;
-  // };
-
-class G4DetectorConstruction : public G4VUserDetectorConstruction
-{
+class G4DetectorConstruction : public G4VUserDetectorConstruction {
   public:
     G4DetectorConstruction(G4double RIndex, DetectorConfig& GeoConf);
-    virtual ~G4DetectorConstruction();
+    ~G4DetectorConstruction() override;
 
-  public:
-    virtual G4VPhysicalVolume* Construct();
+    G4VPhysicalVolume* Construct() override;
 
   private:
-    // methods
-    //
     void DefineMaterials();
     G4VPhysicalVolume* DefineVolumes();
 
     DetectorConfig fConfig;
-
-
-    // World
-    G4double world_x, world_y, world_z;
-
-    G4double VLAr_x, VLAr_y, VLAr_z;
-
-    G4double Pixel_x, Pixel_y, Pixel_z;
-
-    G4double clearance;
-
-    G4bool  fCheckOverlaps; // option to activate checking of volumes overlaps
-
+    G4bool fCheckOverlaps;
     G4double Refr_Index;
+    G4bool fBuildLattice;
+
+    G4LogicalVolume* fWaterLogical;
+    G4LogicalVolume* fWallLogical;
+    G4LogicalVolume* fLappdTopLogical;
+    G4LogicalVolume* fLappdBottomLogical;
 };
 
 #endif /*G4DetectorConstruction_h*/
