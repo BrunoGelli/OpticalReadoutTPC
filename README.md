@@ -11,8 +11,8 @@ Defaults are defined in `src/G4Manager.cc` through `DetectorConfig`:
 - `worldHeightCm`
 - `lappdSizeCm`
 - `driftDistanceCm` (distance between top/bottom LAPPDs)
-- `guidePitchCm` (lattice pitch)
-- `wallThicknessMm`
+- `guidePitchCm` (center-to-center guide pitch; grid is adjusted to exactly tile the LAPPD)
+- `wallThicknessMm` (single-prism wall thickness; neighboring prisms make an effective 2x wall between channels)
 - `wallReflectivity`
 - `lappdPixelCm` (MC-like pixelization used for hit output)
 
@@ -103,3 +103,10 @@ EventDisplay(0, 0, false);
 EventDisplay(0, 0, true, 5.0, 10.0, -2.0, 2.0);
 EventDisplay3D(0, 0);
 ```
+
+### GUI/geometry debugging tip
+If you want to quickly check visualization without building the guide lattice, disable it with:
+```bash
+ORTPC_BUILD_LATTICE=0 ./g4Sim
+```
+By default, the lattice is enabled (`ORTPC_BUILD_LATTICE=1` or unset).

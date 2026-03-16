@@ -22,6 +22,7 @@ class G4DetectorConstruction : public G4VUserDetectorConstruction {
     DetectorConfig fConfig;
     G4bool fCheckOverlaps;
     G4double Refr_Index;
+    G4bool fBuildLattice;
 
     G4LogicalVolume* fWaterLogical;
     G4LogicalVolume* fWallLogical;
