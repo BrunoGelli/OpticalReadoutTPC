@@ -118,22 +118,26 @@ G4VPhysicalVolume* G4DetectorConstruction::DefineVolumes() {
     const auto requestedPitch = std::max(0.1 * mm, fConfig.guidePitchCm * cm);
     const auto nCells = std::max(1, static_cast<G4int>(std::round((2.0 * lappdHalfXY) / requestedPitch)));
     const auto pitch = (2.0 * lappdHalfXY) / nCells;
-    const auto innerHalf = std::max(0.01 * mm, 0.5 * pitch - wallThickness);
+    const auto halfCell = 0.5 * pitch;
+    const auto innerHalf = std::max(0.01 * mm, halfCell - wallThickness);
 
-    auto* guideOuter = new G4Box("GuideOuter", 0.5 * pitch, 0.5 * pitch, driftHalfZ);
+    auto* guideCellSolid = new G4Box("GuideCell", halfCell, halfCell, driftHalfZ);
+    auto* guideCellLogical = new G4LogicalVolume(guideCellSolid, water, "GuideCellLogical");
+
+    new G4PVParameterised("GuideCell",
+                          guideCellLogical,
+                          fWaterLogical,
+                          kUndefined,
+                          nCells * nCells,
+                          new GuideGridParameterisation(nCells, nCells, pitch),
+                          fCheckOverlaps);
+
+    auto* guideOuter = new G4Box("GuideOuter", halfCell, halfCell, driftHalfZ);
     auto* guideInner = new G4Box("GuideInner", innerHalf, innerHalf, driftHalfZ + 0.1 * mm);
     auto* guideWallSolid = new G4SubtractionSolid("GuideWallPrism", guideOuter, guideInner);
 
     fWallLogical = new G4LogicalVolume(guideWallSolid, wallMaterial, "GuideWallLogical");
-
-    const auto nCopies = nCells * nCells;
-    new G4PVParameterised("GuideWall",
-                          fWallLogical,
-                          fWaterLogical,
-                          kUndefined,
-                          nCopies,
-                          new GuideGridParameterisation(nCells, nCells, pitch),
-                          fCheckOverlaps);
+    new G4PVPlacement(nullptr, {}, fWallLogical, "GuideWall", guideCellLogical, false, 0, fCheckOverlaps);
 
     G4double photonEnergy[kNumOpticalEntries] = {2.0 * eV, 4.2 * eV};
     G4double reflectivity[kNumOpticalEntries] = {fConfig.wallReflectivity, fConfig.wallReflectivity};
@@ -151,6 +155,10 @@ G4VPhysicalVolume* G4DetectorConstruction::DefineVolumes() {
     wallOpticalSurface->SetMaterialPropertiesTable(wallSurfaceMPT);
 
     new G4LogicalSkinSurface("GuideWallSkin", fWallLogical, wallOpticalSurface);
+
+    auto* guideCellVis = new G4VisAttributes(G4Colour(0.2, 0.4, 1.0, 0.0));
+    guideCellVis->SetVisibility(false);
+    guideCellLogical->SetVisAttributes(guideCellVis);
   }
 
   auto* lappdSolid = new G4Box("LAPPDWindow", lappdHalfXY, lappdHalfXY, lappdWindowThickness * 0.5);
