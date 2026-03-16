@@ -3,6 +3,7 @@
 
 #include "G4ThreeVector.hh"
 #include "G4UserEventAction.hh"
+#include "G4ThreeVector.hh"
 #include "globals.hh"
 
 class G4Event;
