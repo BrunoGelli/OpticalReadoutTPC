@@ -85,73 +85,73 @@ G4VPhysicalVolume* G4DetectorConstruction::DefineVolumes() {
   auto* wallXSolid = new G4Box("GuideWallXSegment", wallThickness * 0.5, lappdHalfXY, driftHalfZ);
   auto* wallYSolid = new G4Box("GuideWallYSegment", lappdHalfXY, wallThickness * 0.5, driftHalfZ);
 
-  auto* latticeSolid = new G4MultiUnion("GuideWallLattice");
-  for (G4int i = -nLines / 2; i <= nLines / 2; ++i) {
-    const auto offset = i * pitch;
-    if (std::abs(offset) < lappdHalfXY) {
-      latticeSolid->AddNode(*wallXSolid, G4Transform3D(G4RotationMatrix(), G4ThreeVector(offset, 0., 0.)));
-      latticeSolid->AddNode(*wallYSolid, G4Transform3D(G4RotationMatrix(), G4ThreeVector(0., offset, 0.)));
-    }
-  }
-  latticeSolid->Voxelize();
+  // auto* latticeSolid = new G4MultiUnion("GuideWallLattice");
+  // for (G4int i = -nLines / 2; i <= nLines / 2; ++i) {
+  //   const auto offset = i * pitch;
+  //   if (std::abs(offset) < lappdHalfXY) {
+  //     latticeSolid->AddNode(*wallXSolid, G4Transform3D(G4RotationMatrix(), G4ThreeVector(offset, 0., 0.)));
+  //     latticeSolid->AddNode(*wallYSolid, G4Transform3D(G4RotationMatrix(), G4ThreeVector(0., offset, 0.)));
+  //   }
+  // }
+  // latticeSolid->Voxelize();
 
-  fWallLogical = new G4LogicalVolume(latticeSolid, wallMaterial, "GuideWallLatticeLogical");
-  new G4PVPlacement(nullptr, {}, fWallLogical, "GuideWallLattice", fWaterLogical, false, 0, fCheckOverlaps);
+  // fWallLogical = new G4LogicalVolume(latticeSolid, wallMaterial, "GuideWallLatticeLogical");
+  // new G4PVPlacement(nullptr, {}, fWallLogical, "GuideWallLattice", fWaterLogical, false, 0, fCheckOverlaps);
 
-  auto* lappdSolid = new G4Box("LAPPDWindow", lappdHalfXY, lappdHalfXY, lappdWindowThickness * 0.5);
-  fLappdTopLogical = new G4LogicalVolume(lappdSolid, lappdWindow, "LAPPDTopLogical");
-  fLappdBottomLogical = new G4LogicalVolume(lappdSolid, lappdWindow, "LAPPDBottomLogical");
+  // auto* lappdSolid = new G4Box("LAPPDWindow", lappdHalfXY, lappdHalfXY, lappdWindowThickness * 0.5);
+  // fLappdTopLogical = new G4LogicalVolume(lappdSolid, lappdWindow, "LAPPDTopLogical");
+  // fLappdBottomLogical = new G4LogicalVolume(lappdSolid, lappdWindow, "LAPPDBottomLogical");
 
-  new G4PVPlacement(nullptr,
-                    {0., 0., driftHalfZ + 0.5 * lappdWindowThickness},
-                    fLappdTopLogical,
-                    "LAPPDTop",
-                    worldLogical,
-                    false,
-                    0,
-                    fCheckOverlaps);
-  new G4PVPlacement(nullptr,
-                    {0., 0., -driftHalfZ - 0.5 * lappdWindowThickness},
-                    fLappdBottomLogical,
-                    "LAPPDBottom",
-                    worldLogical,
-                    false,
-                    1,
-                    fCheckOverlaps);
+  // new G4PVPlacement(nullptr,
+  //                   {0., 0., driftHalfZ + 0.5 * lappdWindowThickness},
+  //                   fLappdTopLogical,
+  //                   "LAPPDTop",
+  //                   worldLogical,
+  //                   false,
+  //                   0,
+  //                   fCheckOverlaps);
+  // new G4PVPlacement(nullptr,
+  //                   {0., 0., -driftHalfZ - 0.5 * lappdWindowThickness},
+  //                   fLappdBottomLogical,
+  //                   "LAPPDBottom",
+  //                   worldLogical,
+  //                   false,
+  //                   1,
+  //                   fCheckOverlaps);
 
-  G4double photonEnergy[kNumOpticalEntries] = {2.0 * eV, 4.2 * eV};
-  G4double reflectivity[kNumOpticalEntries] = {fConfig.wallReflectivity, fConfig.wallReflectivity};
-  G4double efficiency[kNumOpticalEntries] = {0.0, 0.0};
+  // G4double photonEnergy[kNumOpticalEntries] = {2.0 * eV, 4.2 * eV};
+  // G4double reflectivity[kNumOpticalEntries] = {fConfig.wallReflectivity, fConfig.wallReflectivity};
+  // G4double efficiency[kNumOpticalEntries] = {0.0, 0.0};
 
-  auto* wallSurfaceMPT = new G4MaterialPropertiesTable();
-  wallSurfaceMPT->AddProperty("REFLECTIVITY", photonEnergy, reflectivity, kNumOpticalEntries);
-  wallSurfaceMPT->AddProperty("EFFICIENCY", photonEnergy, efficiency, kNumOpticalEntries);
+  // auto* wallSurfaceMPT = new G4MaterialPropertiesTable();
+  // wallSurfaceMPT->AddProperty("REFLECTIVITY", photonEnergy, reflectivity, kNumOpticalEntries);
+  // wallSurfaceMPT->AddProperty("EFFICIENCY", photonEnergy, efficiency, kNumOpticalEntries);
 
-  auto* wallOpticalSurface = new G4OpticalSurface("GuideWallOpticalSurface");
-  wallOpticalSurface->SetType(dielectric_metal);
-  wallOpticalSurface->SetModel(unified);
-  wallOpticalSurface->SetFinish(groundfrontpainted);
-  wallOpticalSurface->SetSigmaAlpha(0.05);
-  wallOpticalSurface->SetMaterialPropertiesTable(wallSurfaceMPT);
+  // auto* wallOpticalSurface = new G4OpticalSurface("GuideWallOpticalSurface");
+  // wallOpticalSurface->SetType(dielectric_metal);
+  // wallOpticalSurface->SetModel(unified);
+  // wallOpticalSurface->SetFinish(groundfrontpainted);
+  // wallOpticalSurface->SetSigmaAlpha(0.05);
+  // wallOpticalSurface->SetMaterialPropertiesTable(wallSurfaceMPT);
 
-  new G4LogicalSkinSurface("GuideWallLatticeSkin", fWallLogical, wallOpticalSurface);
+  // new G4LogicalSkinSurface("GuideWallLatticeSkin", fWallLogical, wallOpticalSurface);
 
-  auto* worldVis = new G4VisAttributes(G4Colour(0.8, 0.8, 0.8, 0.05));
-  worldVis->SetVisibility(false);
-  worldLogical->SetVisAttributes(worldVis);
+  // auto* worldVis = new G4VisAttributes(G4Colour(0.8, 0.8, 0.8, 0.05));
+  // worldVis->SetVisibility(false);
+  // worldLogical->SetVisAttributes(worldVis);
 
-  auto* waterVis = new G4VisAttributes(G4Colour(0.2, 0.4, 1.0, 0.20));
-  waterVis->SetForceSolid(true);
-  fWaterLogical->SetVisAttributes(waterVis);
+  // auto* waterVis = new G4VisAttributes(G4Colour(0.2, 0.4, 1.0, 0.20));
+  // waterVis->SetForceSolid(true);
+  // fWaterLogical->SetVisAttributes(waterVis);
 
-  auto* wallVis = new G4VisAttributes(G4Colour(0.9, 0.9, 0.9, 0.8));
-  wallVis->SetForceSolid(true);
-  fWallLogical->SetVisAttributes(wallVis);
+  // auto* wallVis = new G4VisAttributes(G4Colour(0.9, 0.9, 0.9, 0.8));
+  // wallVis->SetForceSolid(true);
+  // fWallLogical->SetVisAttributes(wallVis);
 
-  auto* lappdVis = new G4VisAttributes(G4Colour(1.0, 0.3, 0.2, 0.9));
-  lappdVis->SetForceSolid(true);
-  fLappdTopLogical->SetVisAttributes(lappdVis);
-  fLappdBottomLogical->SetVisAttributes(lappdVis);
+  // auto* lappdVis = new G4VisAttributes(G4Colour(1.0, 0.3, 0.2, 0.9));
+  // lappdVis->SetForceSolid(true);
+  // fLappdTopLogical->SetVisAttributes(lappdVis);
+  // fLappdBottomLogical->SetVisAttributes(lappdVis);
 
   return worldPhysical;
 }
