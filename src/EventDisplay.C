@@ -1,13 +1,18 @@
 // Usage from ROOT prompt:
 // .x EventDisplay.C
-// EventDisplay(0, 0, false);                       // occupancy maps + full-LAPPD timing, clickable top maps
-// EventDisplay(0, 0, true, 5.0, 10.0, -2.0, 2.0); // mean-time maps + selected XY region timing
-// EventDisplay3D(0, 0);                            // 3D primary track + photon hits + time-based z reconstruction
+// EventDisplay(0, 0, false);                              // occupancy maps + full-LAPPD timing, clickable top maps
+// EventDisplay(0, 0, true, 5.0, 10.0, -2.0, 2.0);        // mean-time maps + selected XY region timing
+// EventDisplay3D(0, 0);                                   // defaults to p10 timing estimator + v_eff reconstruction
+// EventDisplay3D(0, 0, "first");                         // earliest photon per cell
+// EventDisplay3D(0, 0, "mean");                          // mean photo-arrival time per cell
+// EventDisplay3D(0, 0, "p10", 0.10);                    // average of first 10% photons (robust-leading edge)
 
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <map>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -42,6 +47,37 @@ std::pair<double, double> SnapToCellBounds(double x) {
     const double xmin = -halfSize + ix * pitch;
     const double xmax = xmin + pitch;
     return {xmin, xmax};
+}
+
+double EstimateCellTime(const std::vector<double>& times, const std::string& estimator, double earlyFraction) {
+    if (times.empty()) return std::numeric_limits<double>::quiet_NaN();
+
+    if (estimator == "first") {
+        return *std::min_element(times.begin(), times.end());
+    }
+
+    if (estimator == "mean") {
+        double s = 0.0;
+        for (double t : times) s += t;
+        return s / times.size();
+    }
+
+    if (estimator == "median") {
+        std::vector<double> tmp = times;
+        const size_t mid = tmp.size() / 2;
+        std::nth_element(tmp.begin(), tmp.begin() + mid, tmp.end());
+        return tmp[mid];
+    }
+
+    // default and recommended: leading-edge robust estimator (pXX mean).
+    // "p10" -> average of earliest 10% photons per cell.
+    std::vector<double> tmp = times;
+    std::sort(tmp.begin(), tmp.end());
+    const double frac = std::max(1e-3, std::min(1.0, earlyFraction));
+    const size_t nLead = std::max<size_t>(1, static_cast<size_t>(std::round(frac * tmp.size())));
+    double s = 0.0;
+    for (size_t i = 0; i < nLead; ++i) s += tmp[i];
+    return s / nLead;
 }
 
 void DrawTimingHistOnPad(int lappd,
@@ -122,6 +158,63 @@ void HandleClickForLappd(int /*lappd*/) {
 
 void ED_ClickLAPPD0() { HandleClickForLappd(0); }
 void ED_ClickLAPPD1() { HandleClickForLappd(1); }
+
+void DrawGuideGrid3D(int nCells, double pitch, double halfSize, double halfGuide) {
+    const int color = kGray + 1;
+
+    for (int i = 0; i <= nCells; ++i) {
+        const double x = -halfSize + i * pitch;
+        auto* topLineX = new TPolyLine3D(2);
+        topLineX->SetPoint(0, x, -halfSize, +halfGuide);
+        topLineX->SetPoint(1, x, +halfSize, +halfGuide);
+        topLineX->SetLineColor(color);
+        topLineX->SetLineStyle(3);
+        topLineX->SetLineWidth(1);
+        topLineX->Draw("same");
+
+        auto* botLineX = new TPolyLine3D(2);
+        botLineX->SetPoint(0, x, -halfSize, -halfGuide);
+        botLineX->SetPoint(1, x, +halfSize, -halfGuide);
+        botLineX->SetLineColor(color);
+        botLineX->SetLineStyle(3);
+        botLineX->SetLineWidth(1);
+        botLineX->Draw("same");
+
+        const double y = -halfSize + i * pitch;
+        auto* topLineY = new TPolyLine3D(2);
+        topLineY->SetPoint(0, -halfSize, y, +halfGuide);
+        topLineY->SetPoint(1, +halfSize, y, +halfGuide);
+        topLineY->SetLineColor(color);
+        topLineY->SetLineStyle(3);
+        topLineY->SetLineWidth(1);
+        topLineY->Draw("same");
+
+        auto* botLineY = new TPolyLine3D(2);
+        botLineY->SetPoint(0, -halfSize, y, -halfGuide);
+        botLineY->SetPoint(1, +halfSize, y, -halfGuide);
+        botLineY->SetLineColor(color);
+        botLineY->SetLineStyle(3);
+        botLineY->SetLineWidth(1);
+        botLineY->Draw("same");
+    }
+
+    // Guide volume vertical outline
+    const double corners[4][2] = {
+        {-halfSize, -halfSize},
+        {+halfSize, -halfSize},
+        {+halfSize, +halfSize},
+        {-halfSize, +halfSize}
+    };
+    for (int i = 0; i < 4; ++i) {
+        auto* edge = new TPolyLine3D(2);
+        edge->SetPoint(0, corners[i][0], corners[i][1], -halfGuide);
+        edge->SetPoint(1, corners[i][0], corners[i][1], +halfGuide);
+        edge->SetLineColor(color);
+        edge->SetLineStyle(2);
+        edge->SetLineWidth(2);
+        edge->Draw("same");
+    }
+}
 
 } // namespace
 
@@ -227,7 +320,10 @@ void EventDisplay(int runId = 0,
     gEventCanvas->Update();
 }
 
-void EventDisplay3D(int runId = 0, int eventId = 0) {
+void EventDisplay3D(int runId = 0,
+                    int eventId = 0,
+                    const char* timeEstimator = "p10",
+                    double earlyFraction = 0.10) {
     TFile *f = new TFile("OutPut.root");
     if (!f || f->IsZombie()) {
         std::cerr << "Failed to open OutPut.root" << std::endl;
@@ -302,10 +398,8 @@ void EventDisplay3D(int runId = 0, int eventId = 0) {
     std::vector<double> botX, botY, botZ;
 
     struct CellAccum {
-        double sumTop = 0.0;
-        double sumBottom = 0.0;
-        int nTop = 0;
-        int nBottom = 0;
+        std::vector<double> topTimes;
+        std::vector<double> bottomTimes;
     };
     std::map<std::pair<int,int>, CellAccum> cellTime;
 
@@ -335,32 +429,36 @@ void EventDisplay3D(int runId = 0, int eventId = 0) {
         auto& acc = cellTime[{ix, iy}];
         const double dt = ht - primary_t0_ns;
         if (h_lappd == 0) {
-            acc.sumTop += dt;
-            acc.nTop += 1;
+            acc.topTimes.push_back(dt);
         } else {
-            acc.sumBottom += dt;
-            acc.nBottom += 1;
+            acc.bottomTimes.push_back(dt);
         }
     }
 
+    const std::string estimator = timeEstimator ? std::string(timeEstimator) : std::string("p10");
+
     std::vector<double> recoX, recoY, recoZ;
-    constexpr double c_cm_per_ns = 29.9792458;
-    constexpr double nEff = 1.333;
-    const double vGroup = c_cm_per_ns / nEff;
-    const double halfGuide = 0.5 * driftDistanceCm;
+    const double guideLength = driftDistanceCm;
+    const double halfGuide = 0.5 * guideLength;
 
     for (const auto& kv : cellTime) {
         const int ix = kv.first.first;
         const int iy = kv.first.second;
         const auto& acc = kv.second;
-        if (acc.nTop <= 0 || acc.nBottom <= 0) continue;
+        if (acc.topTimes.empty() || acc.bottomTimes.empty()) continue;
 
-        const double tTopMean = acc.sumTop / acc.nTop;
-        const double tBottomMean = acc.sumBottom / acc.nBottom;
+        const double tTop = EstimateCellTime(acc.topTimes, estimator, earlyFraction);
+        const double tBottom = EstimateCellTime(acc.bottomTimes, estimator, earlyFraction);
+        if (!std::isfinite(tTop) || !std::isfinite(tBottom)) continue;
+        if ((tTop + tBottom) <= 0.0) continue;
 
-        // z_reco from timing asymmetry along drift axis:
-        // tTop=(L/2-z)/v, tBottom=(L/2+z)/v  =>  z=(v/2)*(tBottom-tTop)
-        double zReco = 0.5 * vGroup * (tBottomMean - tTopMean);
+        // Requested effective-speed model:
+        // v_eff = L / (t_top + t_bottom), where L is full guide length.
+        const double vEff = guideLength / (tTop + tBottom);
+
+        // z from time asymmetry with v_eff:
+        // z = 0.5 * v_eff * (t_bottom - t_top)
+        double zReco = 0.5 * vEff * (tBottom - tTop);
         zReco = std::max(-halfGuide, std::min(halfGuide, zReco));
 
         const double xCenter = -halfSize + (ix + 0.5) * pitch;
@@ -376,21 +474,23 @@ void EventDisplay3D(int runId = 0, int eventId = 0) {
         return;
     }
 
-    auto* c3 = new TCanvas("c3", "3D event display: true + photon hits + timing reconstruction", 1000, 800);
+    auto* c3 = new TCanvas("c3", "3D event display: true + photon hits + timing reconstruction", 1100, 850);
 
     auto* frame = new TH3D("h3frame",
                            Form("Run %d Event %d;X [cm];Y [cm];Z [cm]", runId, eventId),
-                           10,
-                           -30,
-                           30,
-                           10,
-                           -30,
-                           30,
-                           10,
-                           -60,
-                           60);
+                           12,
+                           -0.7 * lappdSizeCm,
+                           0.7 * lappdSizeCm,
+                           12,
+                           -0.7 * lappdSizeCm,
+                           0.7 * lappdSizeCm,
+                           12,
+                           -0.7 * driftDistanceCm,
+                           0.7 * driftDistanceCm);
     frame->SetStats(false);
     frame->Draw();
+
+    DrawGuideGrid3D(nCells, pitch, halfSize, halfGuide);
 
     TPolyLine3D* trk = nullptr;
     if (!tx.empty()) {
@@ -406,8 +506,8 @@ void EventDisplay3D(int runId = 0, int eventId = 0) {
         mkTop = new TPolyMarker3D((int)topX.size());
         for (size_t i = 0; i < topX.size(); ++i) mkTop->SetPoint((int)i, topX[i], topY[i], topZ[i]);
         mkTop->SetMarkerStyle(20);
-        mkTop->SetMarkerSize(0.7);
-        mkTop->SetMarkerColor(kBlue + 1);
+        mkTop->SetMarkerSize(0.55);
+        mkTop->SetMarkerColor(kAzure + 2);
         mkTop->Draw("same");
     }
 
@@ -416,8 +516,8 @@ void EventDisplay3D(int runId = 0, int eventId = 0) {
         mkBottom = new TPolyMarker3D((int)botX.size());
         for (size_t i = 0; i < botX.size(); ++i) mkBottom->SetPoint((int)i, botX[i], botY[i], botZ[i]);
         mkBottom->SetMarkerStyle(24);
-        mkBottom->SetMarkerSize(0.7);
-        mkBottom->SetMarkerColor(kGreen + 2);
+        mkBottom->SetMarkerSize(0.55);
+        mkBottom->SetMarkerColor(kSpring + 5);
         mkBottom->Draw("same");
     }
 
@@ -426,16 +526,20 @@ void EventDisplay3D(int runId = 0, int eventId = 0) {
         mkReco = new TPolyMarker3D((int)recoX.size());
         for (size_t i = 0; i < recoX.size(); ++i) mkReco->SetPoint((int)i, recoX[i], recoY[i], recoZ[i]);
         mkReco->SetMarkerStyle(29);
-        mkReco->SetMarkerSize(1.2);
+        mkReco->SetMarkerSize(1.35);
         mkReco->SetMarkerColor(kMagenta + 1);
         mkReco->Draw("same");
     }
 
-    auto* leg = new TLegend(0.12, 0.72, 0.65, 0.92);
+    auto* leg = new TLegend(0.12, 0.64, 0.78, 0.92);
+    leg->SetFillStyle(0);
     if (trk) leg->AddEntry(trk, "Primary true track", "l");
     if (mkTop) leg->AddEntry(mkTop, "LAPPD top photon hits", "p");
     if (mkBottom) leg->AddEntry(mkBottom, "LAPPD bottom photon hits", "p");
-    if (mkReco) leg->AddEntry(mkReco, "Per-cell z_{reco} from #Deltat(top-bottom)", "p");
+    if (mkReco) leg->AddEntry(mkReco,
+                              Form("Per-cell z_{reco} (estimator=%s, v_{eff}=L/(t_{top}+t_{bottom}))", estimator.c_str()),
+                              "p");
+    leg->AddEntry((TObject*)nullptr, "Gray dashed: light-guide cell grid/outline", "");
     leg->Draw();
 
     c3->Update();
