@@ -2,7 +2,14 @@
 // .x EventDisplay.C
 // EventDisplay(0, 0, false);                       // occupancy maps + full-LAPPD timing, clickable top maps
 // EventDisplay(0, 0, true, 5.0, 10.0, -2.0, 2.0); // mean-time maps + selected XY region timing
-// EventDisplay3D(0, 0);                            // 3D primary track + photon hits
+// EventDisplay3D(0, 0);                            // 3D primary track + photon hits + time-based z reconstruction
+
+#include <algorithm>
+#include <cmath>
+#include <iostream>
+#include <map>
+#include <utility>
+#include <vector>
 
 namespace {
 TTree* gHitsTree = nullptr;
@@ -11,6 +18,8 @@ int gRunId = 0;
 int gEventId = 0;
 double gPrimaryT0 = 0.0;
 double gPixelCm = 0.6;
+double gCellCm = 5.0;
+double gLappdSizeCm = 50.0;
 
 double gXMinSel = -1e9;
 double gXMaxSel = 1e9;
@@ -19,6 +28,20 @@ double gYMaxSel = 1e9;
 
 TString TimeHistName(int lappd) {
     return Form("hTime_run%d_evt%d_l%d", gRunId, gEventId, lappd);
+}
+
+std::pair<double, double> SnapToCellBounds(double x) {
+    const double safeCell = std::max(1e-6, gCellCm);
+    const double halfSize = 0.5 * gLappdSizeCm;
+    const int nCells = std::max(1, static_cast<int>(std::round(gLappdSizeCm / safeCell)));
+    const double pitch = gLappdSizeCm / nCells;
+
+    int ix = static_cast<int>(std::floor((x + halfSize) / pitch));
+    ix = std::max(0, std::min(nCells - 1, ix));
+
+    const double xmin = -halfSize + ix * pitch;
+    const double xmax = xmin + pitch;
+    return {xmin, xmax};
 }
 
 void DrawTimingHistOnPad(int lappd,
@@ -64,7 +87,17 @@ void DrawTimingHistOnPad(int lappd,
     gPad->Update();
 }
 
-void HandleClickForLappd(int lappd) {
+void DrawSyncedTimingHists(double xMin, double xMax, double yMin, double yMax, const char* titleSuffix) {
+    gXMinSel = xMin;
+    gXMaxSel = xMax;
+    gYMinSel = yMin;
+    gYMaxSel = yMax;
+
+    DrawTimingHistOnPad(0, 3, xMin, xMax, yMin, yMax, titleSuffix);
+    DrawTimingHistOnPad(1, 4, xMin, xMax, yMin, yMax, titleSuffix);
+}
+
+void HandleClickForLappd(int /*lappd*/) {
     if (!gPad || !gEventCanvas) return;
     if (gPad->GetEvent() != kButton1Down) return;
 
@@ -73,20 +106,18 @@ void HandleClickForLappd(int lappd) {
     const double x = gPad->PadtoX(gPad->AbsPixeltoX(ex));
     const double y = gPad->PadtoY(gPad->AbsPixeltoY(ey));
 
-    const double half = 0.5 * gPixelCm;
-    const double xMin = x - half;
-    const double xMax = x + half;
-    const double yMin = y - half;
-    const double yMax = y + half;
+    const auto xBounds = SnapToCellBounds(x);
+    const auto yBounds = SnapToCellBounds(y);
 
-    const int bottomPad = (lappd == 0) ? 3 : 4;
-    DrawTimingHistOnPad(lappd,
-                        bottomPad,
-                        xMin,
-                        xMax,
-                        yMin,
-                        yMax,
-                        Form("(clicked pixel around x=%.2f, y=%.2f)", x, y));
+    DrawSyncedTimingHists(xBounds.first,
+                          xBounds.second,
+                          yBounds.first,
+                          yBounds.second,
+                          Form("(clicked guide-cell x=[%.2f,%.2f], y=[%.2f,%.2f])",
+                               xBounds.first,
+                               xBounds.second,
+                               yBounds.first,
+                               yBounds.second));
 }
 
 void ED_ClickLAPPD0() { HandleClickForLappd(0); }
@@ -118,17 +149,17 @@ void EventDisplay(int runId = 0,
     gHitsTree = hits;
     gRunId = runId;
     gEventId = eventId;
-    gXMinSel = xMinSel;
-    gXMaxSel = xMaxSel;
-    gYMinSel = yMinSel;
-    gYMaxSel = yMaxSel;
 
     double lappdSizeCm = 50.0;
     double pixelCm = 0.6;
+    double guidePitchCm = 5.0;
     config->SetBranchAddress("lappd_size_cm", &lappdSizeCm);
     config->SetBranchAddress("lappd_pixel_cm", &pixelCm);
+    config->SetBranchAddress("guide_pitch_cm", &guidePitchCm);
     config->GetEntry(0);
     gPixelCm = pixelCm;
+    gCellCm = guidePitchCm;
+    gLappdSizeCm = lappdSizeCm;
 
     double primary_t0_ns = 0.0;
     int evt_run = -1;
@@ -192,9 +223,7 @@ void EventDisplay(int runId = 0,
         if (lappd == 1) gPad->AddExec("edclick1", "ED_ClickLAPPD1();");
     }
 
-    DrawTimingHistOnPad(0, 3, xMinSel, xMaxSel, yMinSel, yMaxSel, "");
-    DrawTimingHistOnPad(1, 4, xMinSel, xMaxSel, yMinSel, yMaxSel, "");
-
+    DrawSyncedTimingHists(xMinSel, xMaxSel, yMinSel, yMaxSel, "");
     gEventCanvas->Update();
 }
 
@@ -207,8 +236,38 @@ void EventDisplay3D(int runId = 0, int eventId = 0) {
 
     TTree *steps = (TTree*)f->Get("primary_steps");
     TTree *hits = (TTree*)f->Get("photon_hits");
-    if (!steps || !hits) {
-        std::cerr << "Missing primary_steps or photon_hits tree!" << std::endl;
+    TTree *evt = (TTree*)f->Get("event");
+    TTree *config = (TTree*)f->Get("config");
+    if (!steps || !hits || !evt || !config) {
+        std::cerr << "Missing primary_steps/photon_hits/event/config tree!" << std::endl;
+        return;
+    }
+
+    double driftDistanceCm = 80.0;
+    double guidePitchCm = 5.0;
+    double lappdSizeCm = 50.0;
+    config->SetBranchAddress("drift_distance_cm", &driftDistanceCm);
+    config->SetBranchAddress("guide_pitch_cm", &guidePitchCm);
+    config->SetBranchAddress("lappd_size_cm", &lappdSizeCm);
+    config->GetEntry(0);
+
+    double primary_t0_ns = 0.0;
+    int evt_run = -1;
+    int evt_evt = -1;
+    evt->SetBranchAddress("run", &evt_run);
+    evt->SetBranchAddress("evt", &evt_evt);
+    evt->SetBranchAddress("primary_t0_ns", &primary_t0_ns);
+
+    bool foundEvent = false;
+    for (Long64_t i = 0; i < evt->GetEntries(); ++i) {
+        evt->GetEntry(i);
+        if (evt_run == runId && evt_evt == eventId) {
+            foundEvent = true;
+            break;
+        }
+    }
+    if (!foundEvent) {
+        std::cerr << "Could not find run=" << runId << " event=" << eventId << " in event tree." << std::endl;
         return;
     }
 
@@ -230,19 +289,34 @@ void EventDisplay3D(int runId = 0, int eventId = 0) {
     }
 
     int h_run, h_evt, h_lappd;
-    double hx, hy, hz;
+    double hx, hy, hz, ht;
     hits->SetBranchAddress("run", &h_run);
     hits->SetBranchAddress("evt", &h_evt);
     hits->SetBranchAddress("lappd_id", &h_lappd);
     hits->SetBranchAddress("x_cm", &hx);
     hits->SetBranchAddress("y_cm", &hy);
     hits->SetBranchAddress("z_cm", &hz);
+    hits->SetBranchAddress("t_ns", &ht);
 
     std::vector<double> topX, topY, topZ;
     std::vector<double> botX, botY, botZ;
+
+    struct CellAccum {
+        double sumTop = 0.0;
+        double sumBottom = 0.0;
+        int nTop = 0;
+        int nBottom = 0;
+    };
+    std::map<std::pair<int,int>, CellAccum> cellTime;
+
+    const double halfSize = 0.5 * lappdSizeCm;
+    const int nCells = std::max(1, static_cast<int>(std::round(lappdSizeCm / std::max(1e-6, guidePitchCm))));
+    const double pitch = lappdSizeCm / nCells;
+
     for (Long64_t i = 0; i < hits->GetEntries(); ++i) {
         hits->GetEntry(i);
         if (h_run != runId || h_evt != eventId) continue;
+
         if (h_lappd == 0) {
             topX.push_back(hx);
             topY.push_back(hy);
@@ -252,14 +326,57 @@ void EventDisplay3D(int runId = 0, int eventId = 0) {
             botY.push_back(hy);
             botZ.push_back(hz);
         }
+
+        int ix = static_cast<int>(std::floor((hx + halfSize) / pitch));
+        int iy = static_cast<int>(std::floor((hy + halfSize) / pitch));
+        ix = std::max(0, std::min(nCells - 1, ix));
+        iy = std::max(0, std::min(nCells - 1, iy));
+
+        auto& acc = cellTime[{ix, iy}];
+        const double dt = ht - primary_t0_ns;
+        if (h_lappd == 0) {
+            acc.sumTop += dt;
+            acc.nTop += 1;
+        } else {
+            acc.sumBottom += dt;
+            acc.nBottom += 1;
+        }
     }
 
-    if (tx.empty() && topX.empty() && botX.empty()) {
+    std::vector<double> recoX, recoY, recoZ;
+    constexpr double c_cm_per_ns = 29.9792458;
+    constexpr double nEff = 1.333;
+    const double vGroup = c_cm_per_ns / nEff;
+    const double halfGuide = 0.5 * driftDistanceCm;
+
+    for (const auto& kv : cellTime) {
+        const int ix = kv.first.first;
+        const int iy = kv.first.second;
+        const auto& acc = kv.second;
+        if (acc.nTop <= 0 || acc.nBottom <= 0) continue;
+
+        const double tTopMean = acc.sumTop / acc.nTop;
+        const double tBottomMean = acc.sumBottom / acc.nBottom;
+
+        // z_reco from timing asymmetry along drift axis:
+        // tTop=(L/2-z)/v, tBottom=(L/2+z)/v  =>  z=(v/2)*(tBottom-tTop)
+        double zReco = 0.5 * vGroup * (tBottomMean - tTopMean);
+        zReco = std::max(-halfGuide, std::min(halfGuide, zReco));
+
+        const double xCenter = -halfSize + (ix + 0.5) * pitch;
+        const double yCenter = -halfSize + (iy + 0.5) * pitch;
+
+        recoX.push_back(xCenter);
+        recoY.push_back(yCenter);
+        recoZ.push_back(zReco);
+    }
+
+    if (tx.empty() && topX.empty() && botX.empty() && recoX.empty()) {
         std::cerr << "No track/hit points found for run=" << runId << " event=" << eventId << std::endl;
         return;
     }
 
-    auto* c3 = new TCanvas("c3", "3D event display: primary track + photon hits", 1000, 800);
+    auto* c3 = new TCanvas("c3", "3D event display: true + photon hits + timing reconstruction", 1000, 800);
 
     auto* frame = new TH3D("h3frame",
                            Form("Run %d Event %d;X [cm];Y [cm];Z [cm]", runId, eventId),
@@ -304,10 +421,21 @@ void EventDisplay3D(int runId = 0, int eventId = 0) {
         mkBottom->Draw("same");
     }
 
-    auto* leg = new TLegend(0.12, 0.78, 0.45, 0.92);
+    TPolyMarker3D* mkReco = nullptr;
+    if (!recoX.empty()) {
+        mkReco = new TPolyMarker3D((int)recoX.size());
+        for (size_t i = 0; i < recoX.size(); ++i) mkReco->SetPoint((int)i, recoX[i], recoY[i], recoZ[i]);
+        mkReco->SetMarkerStyle(29);
+        mkReco->SetMarkerSize(1.2);
+        mkReco->SetMarkerColor(kMagenta + 1);
+        mkReco->Draw("same");
+    }
+
+    auto* leg = new TLegend(0.12, 0.72, 0.65, 0.92);
     if (trk) leg->AddEntry(trk, "Primary true track", "l");
     if (mkTop) leg->AddEntry(mkTop, "LAPPD top photon hits", "p");
     if (mkBottom) leg->AddEntry(mkBottom, "LAPPD bottom photon hits", "p");
+    if (mkReco) leg->AddEntry(mkReco, "Per-cell z_{reco} from #Deltat(top-bottom)", "p");
     leg->Draw();
 
     c3->Update();
