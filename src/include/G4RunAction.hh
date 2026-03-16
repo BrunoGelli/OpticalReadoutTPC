@@ -26,6 +26,11 @@ class G4RunAction : public G4UserRunAction {
     G4Timer* timer;
     DetectorConfig fConfig;
     G4bool fAnalysisInitialized;
+
+    G4int fEventNtupleId;
+    G4int fPhotonHitsNtupleId;
+    G4int fPrimaryStepsNtupleId;
+    G4int fConfigNtupleId;
 };
 
 #endif /*G4RunAction_h*/
